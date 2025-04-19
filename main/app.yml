@@ -1,0 +1,8 @@
+toolkit:
+  auth:
+    jwt-secret: "my-jwt-secret"
+    jwt-expires-in: "12h"
+
+moduleauth:
+  db:
+    dsn: ":memory:"
