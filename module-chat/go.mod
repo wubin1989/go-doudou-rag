@@ -1,12 +1,10 @@
-module go-doudou-rag/main
+module go-doudou-rag/module-chat
 
 go 1.23
 
 require (
-	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
-	github.com/grpc-ecosystem/go-grpc-middleware/providers/zerolog/v2 v2.0.0-rc.2
-	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.0.0-rc.2
-	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
+	github.com/brianvoe/gofakeit/v6 v6.10.0
+	github.com/bytedance/sonic v1.13.2
 	github.com/unionj-cloud/go-doudou/v2 v2.5.9-0.20250419160637-36ece1f43031
 	github.com/unionj-cloud/toolkit v0.0.7-0.20250418144858-a3b948354147
 	google.golang.org/grpc v1.64.1
@@ -22,7 +20,6 @@ require (
 	github.com/ascarter/requestid v0.0.0-20170313220838-5b76ab3d4aee // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
-	github.com/bytedance/sonic v1.13.2 // indirect
 	github.com/bytedance/sonic/loader v0.2.4 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/cloudwego/base64x v0.1.5 // indirect

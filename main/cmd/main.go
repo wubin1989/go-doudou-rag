@@ -5,6 +5,8 @@
 package main
 
 import (
+	"go-doudou-rag/toolkit/auth"
+
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	grpczerolog "github.com/grpc-ecosystem/go-grpc-middleware/providers/zerolog/v2"
 	grpc_recovery "github.com/grpc-ecosystem/go-grpc-middleware/recovery"
@@ -18,10 +20,13 @@ import (
 	"github.com/unionj-cloud/go-doudou/v2/framework/rest"
 	"github.com/unionj-cloud/toolkit/pipeconn"
 	"github.com/unionj-cloud/toolkit/zlogger"
-	"go-doudou-rag/toolkit/auth"
 	"google.golang.org/grpc"
 
 	_ "go-doudou-rag/module-auth/plugin"
+
+	_ "go-doudou-rag/module-chat/plugin"
+
+	_ "go-doudou-rag/module-knowledge/plugin"
 )
 
 func main() {
