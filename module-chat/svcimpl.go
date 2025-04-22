@@ -18,35 +18,16 @@ type ModuleChatImpl struct {
 	conf *config.Config
 }
 
-func (receiver *ModuleChatImpl) PostUser(ctx context.Context, user dto.GddUser) (data dto.GddUser, err error) {
-	var _result struct {
-		Data dto.GddUser
-	}
-	_ = gofakeit.Struct(&_result)
-	return _result.Data, nil
-}
-func (receiver *ModuleChatImpl) PutUser(ctx context.Context, user dto.GddUser) (re error) {
-	var _result struct {
-	}
-	_ = gofakeit.Struct(&_result)
-	return nil
-}
-func (receiver *ModuleChatImpl) DeleteUser(ctx context.Context, user dto.GddUser) (re error) {
-	var _result struct {
-	}
-	_ = gofakeit.Struct(&_result)
-	return nil
-}
-func (receiver *ModuleChatImpl) GetUsers(ctx context.Context, parameter dto.Parameter) (data dto.Page, err error) {
-	var _result struct {
-		Data dto.Page
-	}
-	_ = gofakeit.Struct(&_result)
-	return _result.Data, nil
-}
-
 func NewModuleChat(conf *config.Config) *ModuleChatImpl {
 	return &ModuleChatImpl{
 		conf: conf,
 	}
+}
+
+func (receiver *ModuleChatImpl) Chat(ctx context.Context, req dto.ChatRequest) (data dto.ChatResponse, err error) {
+	var _result struct {
+		Data dto.ChatResponse
+	}
+	_ = gofakeit.Struct(&_result)
+	return _result.Data, nil
 }

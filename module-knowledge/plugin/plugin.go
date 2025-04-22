@@ -6,20 +6,20 @@ package plugin
 
 import (
 	"github.com/glebarez/sqlite"
-	service "go-doudou-rag/module-knowledge"
-	"go-doudou-rag/module-knowledge/config"
-	"go-doudou-rag/module-knowledge/internal/dao"
-	"go-doudou-rag/module-knowledge/internal/model"
-	"go-doudou-rag/module-knowledge/transport/httpsrv"
-	"gorm.io/gorm"
-	"os"
-
+	"github.com/samber/do"
 	"github.com/unionj-cloud/go-doudou/v2/framework/grpcx"
 	"github.com/unionj-cloud/go-doudou/v2/framework/plugin"
 	"github.com/unionj-cloud/go-doudou/v2/framework/rest"
 	"github.com/unionj-cloud/toolkit/pipeconn"
 	"github.com/unionj-cloud/toolkit/stringutils"
+	service "go-doudou-rag/module-knowledge"
+	"go-doudou-rag/module-knowledge/config"
+	"go-doudou-rag/module-knowledge/internal/dao"
+	"go-doudou-rag/module-knowledge/internal/model"
+	"go-doudou-rag/module-knowledge/transport/httpsrv"
 	"google.golang.org/grpc"
+	"gorm.io/gorm"
+	"os"
 )
 
 var _ plugin.ServicePlugin = (*ModuleKnowledgePlugin)(nil)
@@ -47,20 +47,7 @@ func (receiver *ModuleKnowledgePlugin) GetName() string {
 }
 
 func (receiver *ModuleKnowledgePlugin) Initialize(restServer *rest.RestServer, grpcServer *grpcx.GrpcServer, dialCtx pipeconn.DialContextFunc) {
-	conf := config.LoadFromEnv()
-
-	db, err := gorm.Open(sqlite.Open(conf.Db.Dsn), &gorm.Config{})
-	if err != nil {
-		panic("failed to connect database")
-	}
-
-	if err = db.AutoMigrate(&model.File{}); err != nil {
-		panic(err)
-	}
-
-	dao.Use(db)
-
-	svc := service.NewModuleKnowledge(conf)
+	svc := do.MustInvoke[service.ModuleKnowledge](nil)
 	routes := httpsrv.Routes(httpsrv.NewModuleKnowledgeHandler(svc))
 	restServer.GroupRoutes("/moduleknowledge", routes)
 	restServer.GroupRoutes("/moduleknowledge", rest.DocRoutes(service.Oas))
@@ -68,4 +55,22 @@ func (receiver *ModuleKnowledgePlugin) Initialize(restServer *rest.RestServer, g
 
 func init() {
 	plugin.RegisterServicePlugin(&ModuleKnowledgePlugin{})
+
+	do.Provide[service.ModuleKnowledge](nil, func(injector *do.Injector) (service.ModuleKnowledge, error) {
+		conf := config.LoadFromEnv()
+
+		db, err := gorm.Open(sqlite.Open(conf.Db.Dsn), &gorm.Config{})
+		if err != nil {
+			panic("failed to connect database")
+		}
+
+		if err = db.AutoMigrate(&model.File{}); err != nil {
+			panic(err)
+		}
+
+		dao.Use(db)
+
+		svc := service.NewModuleKnowledge(conf)
+		return svc, nil
+	})
 }

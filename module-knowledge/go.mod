@@ -8,7 +8,9 @@ require (
 	github.com/klippa-app/go-pdfium v1.14.1
 	github.com/lithammer/shortuuid/v4 v4.0.0
 	github.com/philippgille/chromem-go v0.7.0
+	github.com/samber/do v1.6.0
 	github.com/samber/lo v1.39.0
+	github.com/spf13/cast v1.3.1
 	github.com/tmc/langchaingo v0.1.13
 	github.com/unionj-cloud/go-doudou/v2 v2.5.9-0.20250419160637-36ece1f43031
 	github.com/unionj-cloud/toolkit v0.0.7-0.20250418144858-a3b948354147
@@ -122,7 +124,6 @@ require (
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/slok/goresilience v0.2.0 // indirect
 	github.com/spf13/afero v1.10.0 // indirect
-	github.com/spf13/cast v1.3.1 // indirect
 	github.com/spf13/jwalterweatherman v1.0.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/spf13/viper v1.7.1 // indirect

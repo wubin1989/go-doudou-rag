@@ -63,3 +63,13 @@ func (receiver Parameter) GetFilters() interface{} {
 func (receiver Parameter) IParameterInstance() {
 
 }
+
+type ChatRequest struct {
+	Prompt string `json:"prompt" validate:"required"`
+}
+
+type ChatResponse struct {
+	Content   string `json:"content"`
+	RequestID string `json:"request_id"`
+	Type      string `json:"type"`
+}
