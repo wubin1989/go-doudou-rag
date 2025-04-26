@@ -67,7 +67,9 @@ func NewModuleKnowledge(conf *config.Config) *ModuleKnowledgeImpl {
 	db := chromem.NewDB()
 	db.ImportFromFile(conf.Biz.VectorStore.ExportToFile, "")
 
-	embeddingFunc := chromem.NewEmbeddingFuncOpenAICompat("https://api.siliconflow.cn/v1", os.Getenv("OPENAI_API_KEY"), "BAAI/bge-large-zh-v1.5", nil)
+	embeddingFunc := chromem.NewEmbeddingFuncOpenAICompat(conf.Openai.BaseUrl,
+		lo.Ternary(stringutils.IsNotEmpty(conf.Openai.Token), conf.Openai.Token, os.Getenv("OPENAI_API_KEY")),
+		conf.Openai.EmbeddingModel, nil)
 	c, err := db.GetOrCreateCollection("knowledge-base", nil, embeddingFunc)
 	if err != nil {
 		panic(err)

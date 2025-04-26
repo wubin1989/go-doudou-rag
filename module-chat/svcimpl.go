@@ -7,6 +7,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"github.com/unionj-cloud/toolkit/stringutils"
 	"go-doudou-rag/module-chat/config"
 	"go-doudou-rag/module-chat/contextutil"
 	"go-doudou-rag/module-chat/dto"
@@ -59,11 +60,10 @@ func (receiver *ModuleChatImpl) Chat(ctx context.Context, req dto.ChatRequest) (
 	}
 
 	llm, err := openai.New(
-		openai.WithBaseURL("https://api.siliconflow.cn/v1"),
-		openai.WithToken(os.Getenv("OPENAI_API_KEY")),
-		openai.WithEmbeddingModel("BAAI/bge-large-zh-v1.5"),
-		//openai.WithModel("Qwen/Qwen2.5-7B-Instruct"), // 免费
-		openai.WithModel("Qwen/Qwen2.5-32B-Instruct"), // ￥1.26/ M Tokens
+		openai.WithBaseURL(receiver.conf.Openai.BaseUrl),
+		openai.WithToken(lo.Ternary(stringutils.IsNotEmpty(receiver.conf.Openai.Token), receiver.conf.Openai.Token, os.Getenv("OPENAI_API_KEY"))),
+		openai.WithEmbeddingModel(receiver.conf.Openai.EmbeddingModel),
+		openai.WithModel(receiver.conf.Openai.Model),
 	)
 	if err != nil {
 		zlogger.Error().Err(err).Msgf("Create LLM failed, requestId: %s", requestID)

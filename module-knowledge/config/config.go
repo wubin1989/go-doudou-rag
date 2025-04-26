@@ -19,6 +19,11 @@ type Config struct {
 			ExportToFile string
 		}
 	}
+	Openai struct {
+		BaseUrl        string
+		Token          string
+		EmbeddingModel string
+	}
 	Db struct {
 		Dsn string
 	}
