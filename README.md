@@ -8,7 +8,7 @@
 
 ## 测试
 ```shell
-curl -N -X POST 'http://localhost:6060/modulechat/chat' \
+curl -w '\n' -N -X POST 'http://localhost:6060/modulechat/chat' \
 --header 'Content-Type: application/json' \
 --header 'Authorization: Bearer xxx' \
 --data '{
@@ -17,7 +17,7 @@ curl -N -X POST 'http://localhost:6060/modulechat/chat' \
 ```
 
 ```shell
-curl -N -X POST 'http://localhost:6060/modulechat/chat' \
+curl -w '\n' -N -X POST 'http://localhost:6060/modulechat/chat' \
 --header 'Content-Type: application/json' \
 --header 'Authorization: Bearer xxx' \
 --data '{

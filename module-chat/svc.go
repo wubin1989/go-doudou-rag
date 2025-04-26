@@ -21,5 +21,5 @@ curl -N -X POST 'http://localhost:6060/modulechat/chat' \
 }'
 */
 type ModuleChat interface {
-	Chat(ctx context.Context, req dto.ChatRequest) (data dto.ChatResponse, err error)
+	Chat(ctx context.Context, req dto.ChatRequest) (err error)
 }

@@ -6,7 +6,6 @@ package service
 
 import (
 	"context"
-	"github.com/unionj-cloud/toolkit/stringutils"
 	"go-doudou-rag/module-knowledge/config"
 	"go-doudou-rag/module-knowledge/dto"
 	"go-doudou-rag/module-knowledge/internal/dao"
@@ -17,6 +16,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"time"
+
+	"github.com/unionj-cloud/toolkit/stringutils"
 
 	"github.com/klippa-app/go-pdfium/requests"
 	"github.com/klippa-app/go-pdfium/webassembly"

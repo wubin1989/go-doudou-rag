@@ -6,10 +6,22 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"go-doudou-rag/module-chat/config"
+	"go-doudou-rag/module-chat/contextutil"
 	"go-doudou-rag/module-chat/dto"
+	know "go-doudou-rag/module-knowledge"
+	kdto "go-doudou-rag/module-knowledge/dto"
+	"net/http"
+	"os"
 
-	"github.com/brianvoe/gofakeit/v6"
+	"github.com/ascarter/requestid"
+	"github.com/samber/do"
+	"github.com/samber/lo"
+	"github.com/spf13/cast"
+	"github.com/tmc/langchaingo/llms"
+	"github.com/tmc/langchaingo/llms/openai"
+	"github.com/unionj-cloud/toolkit/zlogger"
 )
 
 var _ ModuleChat = (*ModuleChatImpl)(nil)
@@ -24,10 +36,133 @@ func NewModuleChat(conf *config.Config) *ModuleChatImpl {
 	}
 }
 
-func (receiver *ModuleChatImpl) Chat(ctx context.Context, req dto.ChatRequest) (data dto.ChatResponse, err error) {
-	var _result struct {
-		Data dto.ChatResponse
+func (receiver *ModuleChatImpl) Chat(ctx context.Context, req dto.ChatRequest) (err error) {
+	w, _ := contextutil.ResponseWriterFromContext(ctx)
+	requestID, _ := requestid.FromContext(ctx)
+
+	// Set headers before any potential error responses
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("Transfer-Encoding", "chunked")
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		zlogger.Error().Msgf("Streaming not supported, requestId: %s", requestID)
+		chunk := dto.ChatResponse{
+			Content:   "Streaming unsupported by client",
+			RequestID: requestID,
+			Type:      "error",
+		}
+		writeSSEMessage(w, flusher, chunk)
+		return
 	}
-	_ = gofakeit.Struct(&_result)
-	return _result.Data, nil
+
+	llm, err := openai.New(
+		openai.WithBaseURL("https://api.siliconflow.cn/v1"),
+		openai.WithToken(os.Getenv("OPENAI_API_KEY")),
+		openai.WithEmbeddingModel("BAAI/bge-large-zh-v1.5"),
+		//openai.WithModel("Qwen/Qwen2.5-7B-Instruct"), // 免费
+		openai.WithModel("Qwen/Qwen2.5-32B-Instruct"), // ￥1.26/ M Tokens
+	)
+	if err != nil {
+		zlogger.Error().Err(err).Msgf("Create LLM failed, requestId: %s", requestID)
+		chunk := dto.ChatResponse{
+			Content:   err.Error(),
+			RequestID: requestID,
+			Type:      "error",
+		}
+		writeSSEMessage(w, flusher, chunk)
+		return
+	}
+
+	knowService := do.MustInvoke[know.ModuleKnowledge](nil)
+	queryResults, err := knowService.GetQuery(ctx, kdto.QueryReq{
+		Text: req.Prompt,
+		Top:  10,
+	})
+	if err != nil {
+		zlogger.Error().Err(err).Msgf("Query knowledge base failed, requestId: %s", requestID)
+		chunk := dto.ChatResponse{
+			Content:   err.Error(),
+			RequestID: requestID,
+			Type:      "error",
+		}
+		writeSSEMessage(w, flusher, chunk)
+		return
+	}
+
+	queryResults = lo.Filter(queryResults, func(item kdto.QueryResult, index int) bool {
+		return cast.ToFloat64(item.Similarity) >= 0.5
+	})
+
+	if len(queryResults) == 0 {
+		zlogger.Error().Msgf("Knowledge not found, requestId: %s", requestID)
+		chunk := dto.ChatResponse{
+			Content:   "非常抱歉，未能检索到相关信息，无法回答",
+			RequestID: requestID,
+			Type:      "error",
+		}
+		writeSSEMessage(w, flusher, chunk)
+		return
+	}
+
+	prompt := "请结合下面给出的上下文信息回答问题，答案必须分条阐述，力求条理清晰，如果不知道可以回答不知道，但不要编造答案：\n"
+
+	lo.ForEach(queryResults, func(item kdto.QueryResult, index int) {
+		prompt += fmt.Sprintf("%d. %s\n", index+1, item.Content)
+	})
+
+	prompt += "请回答：" + req.Prompt + "\n\n\n"
+
+	chunk := dto.ChatResponse{
+		Content:   prompt,
+		RequestID: requestID,
+		Type:      "prompt",
+	}
+	writeSSEMessage(w, flusher, chunk)
+
+	content := []llms.MessageContent{
+		llms.TextParts(llms.ChatMessageTypeSystem, "You are a senior public policy researcher."),
+		llms.TextParts(llms.ChatMessageTypeHuman, prompt),
+	}
+
+	if _, err = llm.GenerateContent(ctx, content,
+		llms.WithMaxTokens(4096),
+		llms.WithTemperature(0.2),
+		llms.WithStreamingFunc(func(ctx context.Context, chunk []byte) error {
+			chunkResp := dto.ChatResponse{
+				Content:   string(chunk),
+				RequestID: requestID,
+				Type:      "content",
+			}
+			return writeSSEMessage(w, flusher, chunkResp)
+		})); err != nil {
+		zlogger.Error().Err(err).Msgf("[%s] Error creating chat completion stream", requestID)
+		chunk := dto.ChatResponse{
+			Content:   "Failed to create chat completion stream",
+			RequestID: requestID,
+			Type:      "error",
+		}
+		writeSSEMessage(w, flusher, chunk)
+		return
+	}
+	return
+}
+
+func writeSSEMessage(w http.ResponseWriter, flusher http.Flusher, chunk dto.ChatResponse) error {
+	var err error
+	//chunkJSON, err := json.Marshal(chunk)
+	//if err != nil {
+	//	return fmt.Errorf("error marshaling chunk: %v", err)
+	//}
+	//
+	//_, err = fmt.Fprintf(w, "data: %s\n\n", chunkJSON)
+	_, err = fmt.Fprint(w, chunk.Content)
+	if err != nil {
+		return fmt.Errorf("error writing to response: %v", err)
+	}
+
+	flusher.Flush()
+	return nil
 }

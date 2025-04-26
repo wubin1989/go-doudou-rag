@@ -46,7 +46,7 @@ func (receiver *ModuleChatPlugin) Initialize(restServer *rest.RestServer, grpcSe
 	conf := config.LoadFromEnv()
 	svc := service.NewModuleChat(conf)
 	routes := httpsrv.Routes(httpsrv.NewModuleChatHandler(svc))
-	restServer.GroupRoutes("/modulechat", routes)
+	restServer.GroupRoutes("/modulechat", routes, httpsrv.InjectResponseWriter)
 	restServer.GroupRoutes("/modulechat", rest.DocRoutes(service.Oas))
 }
 
