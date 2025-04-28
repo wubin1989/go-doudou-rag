@@ -19,7 +19,7 @@ curl -w '\n' -N -X POST 'http://localhost:6060/modulechat/chat' \
 ```shell
 curl -w '\n' -N -X POST 'http://localhost:6060/modulechat/chat' \
 --header 'Content-Type: application/json' \
---header 'Authorization: Bearer xxx' \
+--header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NDU4OTM4MTMsInVzZXJuYW1lIjoiYWRtaW4ifQ.EjxDfrMMHmOCvt557H8rd5sn9zX-uYOytw4OKH-jLJ8' \
 --data '{
     "prompt": "Java的最新版本是哪个？"            
 }'
