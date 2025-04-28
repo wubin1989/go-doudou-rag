@@ -72,6 +72,11 @@ func (auth *AuthMiddleware) JwtToken(userInfo UserInfo) string {
 
 func (auth *AuthMiddleware) Jwt(inner http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/go-doudou/") {
+			inner.ServeHTTP(w, r)
+			return
+		}
+
 		paramsFromCtx := httprouter.ParamsFromContext(r.Context())
 		routeName := paramsFromCtx.MatchedRouteName()
 
