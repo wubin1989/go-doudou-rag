@@ -1,6 +1,9 @@
-# Go-Doudou框架中的插件机制与模块化可插拔微内核架构实战（一）
+# go-doudou框架中的插件机制与模块化可插拔微内核架构实战（一）
 
-在现代微服务架构设计中，模块化和可插拔的设计模式越来越受到开发者的青睐。Go-Doudou作为一款国产的Go语言微服务框架，提供了优秀的插件机制和模块化架构支持。本文将通过一个基于RAG（检索增强生成）的实际项目来详细讲解Go-Doudou的插件机制和模块化微内核架构的实现方式。
+![programming.jpg](https://p0-xtjj-private.juejin.cn/tos-cn-i-73owjymdk6/d92174f990f54302a3c095b979fb793a~tplv-73owjymdk6-jj-mark-v1:0:0:0:0:5o6Y6YeR5oqA5pyv56S-5Yy6IEAg5q2m5paM:q75.awebp?policy=eyJ2bSI6MywidWlkIjoiNDQ0MTY4MjcwNDYwNzUxNyJ9\&rk3s=e9ecf3d6\&x-orig-authkey=f32326d3454f2ac7e96d3d06cdbb035152127018\&x-orig-expires=1745945284\&x-orig-sign=Bmd60uK%2B0R5cAQqOYSNtq1C%2FGWk%3D)
+Photo by <a href="https://unsplash.com/@cgower?utm_content=creditCopyText&utm_medium=referral&utm_source=unsplash">Christopher Gower</a> on <a href="https://unsplash.com/photos/a-macbook-with-lines-of-code-on-its-screen-on-a-busy-desk-m_HRfLhgABo?utm_content=creditCopyText&utm_medium=referral&utm_source=unsplash">Unsplash</a>
+      
+在现代微服务架构设计中，模块化和可插拔的设计模式越来越受到开发者的青睐。go-doudou作为一款国产的Go语言微服务框架，提供了优秀的插件机制和模块化架构支持。本文将通过一个基于RAG（检索增强生成）的实际项目来详细讲解go-doudou的插件机制和模块化微内核架构的实现方式。
 
 ## 1. 什么是插件机制和微内核架构
 
@@ -16,9 +19,9 @@
 3. **低耦合**：各模块之间通过定义良好的接口通信
 4. **灵活部署**：可以按需加载插件
 
-## 2. Go-Doudou框架的插件机制
+## 2. go-doudou框架的插件机制
 
-Go-Doudou框架通过实现`ServicePlugin`接口来支持插件机制。每个服务模块作为一个插件被注册到主应用中，实现了模块与核心系统的解耦。
+go-doudou框架通过实现`ServicePlugin`接口来支持插件机制。每个服务模块作为一个插件被注册到主应用中，实现了模块与核心系统的解耦。
 
 让我们先看一下该项目中`main/cmd/main.go`的核心代码：
 
@@ -69,7 +72,7 @@ func main() {
 }
 ```
 
-这段代码展示了Go-Doudou的微内核架构实现：
+这段代码展示了go-doudou的微内核架构实现：
 
 1. 通过匿名导入(`_ "go-doudou-rag/module-xxx/plugin"`)各模块的plugin包
 2. 获取所有注册的服务插件 `plugin.GetServicePlugins()`
@@ -160,7 +163,7 @@ func init() {
 
 ## 4. 模块间的通信
 
-在微内核架构中，模块间通信是关键挑战之一。Go-Doudou提供了多种通信方式：
+在微内核架构中，模块间通信是关键挑战之一。go-doudou提供了多种通信方式：
 
 1. **直接依赖调用**：模块可以直接导入其他模块的接口
 2. **依赖注入**：通过`samber/do`库实现依赖注入
@@ -306,7 +309,7 @@ func (receiver *ModuleChatImpl) Chat(ctx context.Context, req dto.ChatRequest) (
 
 ### 7.1 启动系统
 
-通过以下步骤启动此基于Go-Doudou插件架构的RAG系统：
+通过以下步骤启动此基于go-doudou插件架构的RAG系统：
 
 1. **克隆代码库并进入项目目录**
    ```bash
@@ -444,7 +447,15 @@ if len(queryResults) == 0 {
 2. **可插拔性**：各模块可独立更新或替换
 3. **技术解耦**：每个模块可以使用不同的技术栈和数据存储方式
 
+## 8. 总结与展望
+
+本文通过一个实际的RAG聊天系统案例，详细介绍了go-doudou框架中的插件机制与模块化可插拔微内核架构。我们看到，这种架构模式不仅提供了良好的模块化和可扩展性，还使得系统各部分能够松耦合地协同工作，大大提高了开发效率和系统可维护性。
+
+go-doudou框架的插件机制通过`ServicePlugin`接口和依赖注入系统，为开发者提供了一种简洁而强大的方式来构建模块化应用。这种方式特别适合于团队协作开发复杂系统，每个团队可以专注于自己的领域模块，而无需过多关注其他模块的实现细节。
+
+然而，理解概念和原理只是第一步，如何从零开始实际构建这样的系统才是开发者最关心的问题。在下一篇文章《go-doudou框架中的插件机制与模块化可插拔微内核架构实战（二）》中，我们将提供一个详细的实战指南，带领读者一步步从零开始搭建一个完整的go-doudou微内核架构应用。我们将通过具体的命令和代码示例，展示如何使用go-doudou CLI工具创建工作空间、定义服务接口、实现插件、配置模块间通信等全流程操作，帮助开发者快速掌握这一强大架构模式的实际应用方法。
+
 ## 参考资料
 
-- Go-Doudou官方文档：https://go-doudou.github.io/
+- go-doudou官方文档：https://go-doudou.github.io/
 - 本项目源码地址：https://github.com/wubin1989/go-doudou-rag
