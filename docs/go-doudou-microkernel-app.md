@@ -1,6 +1,6 @@
-# Go-Doudou框架中的插件机制与模块化可插拔微内核架构实战（二）
+# go-doudou + langchaingo 微内核架构RAG大模型知识库实战（二）
 
-在上一篇文章中，我们介绍了Go-Doudou框架中的插件机制与模块化可插拔微内核架构的基本概念和原理。本篇文章将详细讲解如何从零开始搭建一个基于Go-Doudou的微内核架构应用，帮助新人快速上手这种先进的微内核架构模式。
+在上一篇文章中，我们介绍了go-doudou框架中的插件机制与模块化可插拔微内核架构的基本概念和原理。本篇文章将详细讲解如何从零开始搭建一个基于go-doudou的微内核架构应用，帮助新人快速上手开发。
 
 ## 1. 微内核架构应用的概念回顾
 
@@ -16,13 +16,13 @@
 3. **灵活部署**：可按需加载模块，系统更加轻量
 4. **独立开发**：团队可以并行开发不同模块
 
-Go-Doudou框架通过其强大的CLI工具和插件机制，使得构建微内核架构应用变得更加简单高效。
+go-doudou框架通过其强大的CLI工具和插件机制，使得构建微内核架构应用变得更加简单高效。
 
 ## 2. 环境准备
 
-### 2.1 安装Go-Doudou CLI
+### 2.1 安装go-doudou CLI
 
-首先，我们需要安装Go-Doudou命令行工具。对于Go 1.17及以上版本，推荐使用以下命令全局安装：
+首先，我们需要安装go-doudou命令行工具。对于Go 1.17及以上版本，推荐使用以下命令全局安装：
 
 ```bash
 go install -v github.com/unionj-cloud/go-doudou/v2@v2.5.9
@@ -42,7 +42,7 @@ go-doudou version
 
 ## 3. 创建工作空间
 
-Go-Doudou提供了`work`命令来创建和管理工作空间，这是构建微内核架构应用的第一步。
+go-doudou提供了`work`命令来创建和管理工作空间，这是构建微内核架构应用的第一步。
 
 ### 3.1 初始化工作空间
 
@@ -72,7 +72,7 @@ go-doudou-rag/
 
 ### 4.1 理解主模块的结构
 
-主模块的`cmd/main.go`文件包含了初始化和启动应用的代码。在Go-Doudou微内核架构中，这个文件通常包含以下内容：
+主模块的`cmd/main.go`文件包含了初始化和启动应用的代码。在go-doudou微内核架构中，这个文件通常包含以下内容：
 
 ```go
 package main
@@ -300,7 +300,7 @@ module-auth/
   └── svcimpl.go      # 服务实现
 ```
 
-同时，Go-Doudou会自动执行`go work use module-auth`将新模块添加到工作空间，并更新主模块的`main.go`文件，添加对新模块插件的导入：
+同时，go-doudou会自动执行`go work use module-auth`将新模块添加到工作空间，并更新主模块的`main.go`文件，添加对新模块插件的导入：
 
 ```go
 import (
@@ -331,7 +331,7 @@ type ModuleAuth interface {
 }
 ```
 
-注意`//go:generate`指令，它告诉Go-Doudou生成HTTP相关代码。
+注意`//go:generate`指令，它告诉go-doudou生成HTTP相关代码。
 
 ### 5.3 创建DTO和模型
 
@@ -622,7 +622,7 @@ type ModuleKnowledge interface {
 
 ## 7. 模块间通信
 
-微内核架构应用中，模块之间需要进行通信。Go-Doudou提供了两种主要的通信方式：直接导入和依赖注入。
+微内核架构应用中，模块之间需要进行通信。go-doudou提供了两种主要的通信方式：直接导入和依赖注入。
 
 ### 7.1 通过直接导入
 
@@ -686,7 +686,7 @@ func (receiver *ModuleChatImpl) Chat(ctx context.Context, req dto.ChatRequest) (
 
 ## 8. 配置管理
 
-Go-Doudou微内核架构应用使用分层的配置管理方式，结合了配置文件和环境变量。
+go-doudou微内核架构应用使用分层的配置管理方式，结合了配置文件和环境变量。
 
 ### 8.1 创建中央配置文件
 
@@ -725,20 +725,25 @@ modulechat:
 
 ### 8.2 环境变量覆盖
 
-Go-Doudou允许通过环境变量覆盖配置文件中的值：
+go-doudou允许通过环境变量覆盖配置文件中的值：
 
 ```bash
 # JWT密钥
-export TOOLKIT_AUTH_JWT_SECRET="production-jwt-secret"
+export TOOLKIT_AUTH_JWTSECRET="awesome-jwt-secret"
+
+# JWT密钥过期时间
+export TOOLKIT_AUTH_JWTEXPIRESIN="24h"
 
 # 数据库连接字符串
 export MODULEAUTH_DB_DSN="/data/production/auth.db"
-
-# OpenAI配置
-export MODULECHAT_OPENAI_TOKEN="production-openai-token"
 ```
 
-环境变量名的构成规则是：模块前缀（大写）+ 下划线 + 配置路径（大写，用下划线分隔）。
+环境变量名的构成规则是：模块前缀（大写）+ 下划线 + 配置路径（大写，用下划线分隔），ymal格式配置中的中横线在环境变量里需去掉。
+
+使用示例：
+```
+TOOLKIT_AUTH_JWTEXPIRESIN=24h TOOLKIT_AUTH_JWTSECRET=awesome-jwt-secret go run cmd/main.go
+```
 
 ## 9. 运行和测试
 
@@ -762,16 +767,18 @@ cd module-auth
 go run cmd/main.go
 ```
 
-独立运行时，模块会启动自己的HTTP服务器，而不会加载其他模块。
+独立运行时，模块会启动自己的HTTP服务器，而不会加载其他模块。未来需要扩展成微服务架构的时候，可以轻松实现架构升级。
 
 ### 9.3 生成API文档
 
-Go-Doudou自动为每个模块生成OpenAPI规范文档，可以通过以下URL访问：
+go-doudou自动为每个模块生成OpenAPI 3.0规范文档，可以通过以下URL访问：
 
 - 主应用（文档首页）：`http://localhost:6060/go-doudou/doc`
 - 认证模块：`http://localhost:6060/moduleauth/go-doudou/doc`
 - 知识库模块：`http://localhost:6060/modulechat/go-doudou/doc`
 - 聊天模块：`http://localhost:6060/moduleknowledge/go-doudou/doc`
+
+具体如何自定义OpenAPI 3.0规范的文档说明，请参考go-doudou官方文档 [接口定义](https://go-doudou.github.io/zh/guide/idl.html) 一节。
 
 ## 10. 最佳实践
 
@@ -822,6 +829,8 @@ knowService := do.MustInvokeNamed[know.ModuleKnowledge]("request", nil)
 
 ## 总结
 
-通过本文的详细指南，我们展示了如何使用Go-Doudou从零构建一个微内核架构应用。这种架构模式具有高度的模块化和可扩展性，非常适合微内核系统和大型应用的开发。
+通过本文的详细指南，我们展示了如何使用go-doudou从零构建一个微内核架构应用。这种架构模式具有高度的模块化和可扩展性，非常适合微内核系统和大型应用的开发。
 
-Go-Doudou的CLI工具和插件机制大大简化了微内核架构的实现，让开发者可以专注于业务逻辑，而不必过多关注基础设施的搭建。通过遵循本文介绍的开发流程和最佳实践，您可以快速掌握基于Go-Doudou构建微内核架构应用的方法。
+go-doudou的CLI工具和插件机制大大简化了微内核架构的实现，让开发者可以专注于业务逻辑，而不必过多关注基础设施的搭建。通过遵循本文介绍的开发流程和最佳实践，您可以快速掌握基于go-doudou构建微内核架构应用的方法。
+
+目前的使用方式是基于命令行或者postman的，在《go-doudou + langchaingo 微内核架构RAG大模型知识库实战（三）》中，我们将加上基于vue 3实现的对话界面，且将前端资源打包编译进聊天模块，实现全栈式开发和轻量化部署。

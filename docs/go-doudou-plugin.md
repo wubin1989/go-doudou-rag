@@ -1,4 +1,4 @@
-# go-doudou框架中的插件机制与模块化可插拔微内核架构实战（一）
+# go-doudou + langchaingo 微内核架构RAG大模型知识库实战（一）
 
 ![programming.jpg](https://p0-xtjj-private.juejin.cn/tos-cn-i-73owjymdk6/d92174f990f54302a3c095b979fb793a~tplv-73owjymdk6-jj-mark-v1:0:0:0:0:5o6Y6YeR5oqA5pyv56S-5Yy6IEAg5q2m5paM:q75.awebp?policy=eyJ2bSI6MywidWlkIjoiNDQ0MTY4MjcwNDYwNzUxNyJ9\&rk3s=e9ecf3d6\&x-orig-authkey=f32326d3454f2ac7e96d3d06cdbb035152127018\&x-orig-expires=1745945284\&x-orig-sign=Bmd60uK%2B0R5cAQqOYSNtq1C%2FGWk%3D)
 Photo by <a href="https://unsplash.com/@cgower?utm_content=creditCopyText&utm_medium=referral&utm_source=unsplash">Christopher Gower</a> on <a href="https://unsplash.com/photos/a-macbook-with-lines-of-code-on-its-screen-on-a-busy-desk-m_HRfLhgABo?utm_content=creditCopyText&utm_medium=referral&utm_source=unsplash">Unsplash</a>
