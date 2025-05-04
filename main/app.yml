@@ -1,3 +1,11 @@
+gdd:
+  write:
+    timeout: 60s
+  read:
+    timeout: 60s
+  idle:
+    timeout: 120s
+
 toolkit:
   auth:
     jwt-secret: "my-jwt-secret"
@@ -25,4 +33,6 @@ modulechat:
     base-url: "https://api.siliconflow.cn/v1"
     token:
     embedding-model: "BAAI/bge-large-zh-v1.5"
-    model: "Qwen/Qwen2.5-32B-Instruct"
+    model: "Qwen/Qwen2.5-7B-Instruct"
+#    model: "Qwen/Qwen2.5-32B-Instruct"
+#    model: "Qwen/Qwen2.5-VL-32B-Instruct"

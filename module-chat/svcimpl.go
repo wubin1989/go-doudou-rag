@@ -6,6 +6,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/unionj-cloud/toolkit/stringutils"
 	"go-doudou-rag/module-chat/config"
@@ -115,12 +116,12 @@ func (receiver *ModuleChatImpl) Chat(ctx context.Context, req dto.ChatRequest) (
 
 	prompt += "请回答：" + req.Prompt + "\n\n\n"
 
-	chunk := dto.ChatResponse{
-		Content:   prompt,
-		RequestID: requestID,
-		Type:      "prompt",
-	}
-	writeSSEMessage(w, flusher, chunk)
+	//chunk := dto.ChatResponse{
+	//	Content:   prompt,
+	//	RequestID: requestID,
+	//	Type:      "prompt",
+	//}
+	//writeSSEMessage(w, flusher, chunk)
 
 	content := []llms.MessageContent{
 		llms.TextParts(llms.ChatMessageTypeSystem, "You are a senior public policy researcher."),
@@ -152,13 +153,13 @@ func (receiver *ModuleChatImpl) Chat(ctx context.Context, req dto.ChatRequest) (
 
 func writeSSEMessage(w http.ResponseWriter, flusher http.Flusher, chunk dto.ChatResponse) error {
 	var err error
-	//chunkJSON, err := json.Marshal(chunk)
-	//if err != nil {
-	//	return fmt.Errorf("error marshaling chunk: %v", err)
-	//}
-	//
-	//_, err = fmt.Fprintf(w, "data: %s\n\n", chunkJSON)
-	_, err = fmt.Fprint(w, chunk.Content)
+	chunkJSON, err := json.Marshal(chunk)
+	if err != nil {
+		return fmt.Errorf("error marshaling chunk: %v", err)
+	}
+
+	_, err = fmt.Fprintf(w, "data: %s\n\n", chunkJSON)
+	//_, err = fmt.Fprint(w, chunk.Content)
 	if err != nil {
 		return fmt.Errorf("error writing to response: %v", err)
 	}

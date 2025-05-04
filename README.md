@@ -10,7 +10,7 @@
 ```shell
 curl -w '\n' -N -X POST 'http://localhost:6060/modulechat/chat' \
 --header 'Content-Type: application/json' \
---header 'Authorization: Bearer xxx' \
+--header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NDY0MTQ0NzYsInVzZXJuYW1lIjoiYWRtaW4ifQ.hli_WvAIOfeTHQa6YV5BqxEtuOXx-VKZ6Mvao8B8iH0' \
 --data '{
     "prompt": "最近杭州出台了什么经济相关的政策？"
 }'
