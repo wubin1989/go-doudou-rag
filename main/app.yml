@@ -1,0 +1,38 @@
+gdd:
+  write:
+    timeout: 120s
+  read:
+    timeout: 120s
+  idle:
+    timeout: 120s
+
+toolkit:
+  auth:
+    jwt-secret: "my-jwt-secret"
+    jwt-expires-in: "12h"
+
+moduleauth:
+  db:
+#    dsn: ":memory:"
+    dsn: "/Users/wubin1989/workspace/cloud/unionj-cloud/go-doudou-rag/data/auth.db"
+
+moduleknowledge:
+  biz:
+    file-save-path: "/Users/wubin1989/workspace/cloud/unionj-cloud/go-doudou-rag/data/files"
+    vector-store:
+      export-to-file: "/Users/wubin1989/workspace/cloud/unionj-cloud/go-doudou-rag/data/chromem-go.gob"
+  db:
+    dsn: "/Users/wubin1989/workspace/cloud/unionj-cloud/go-doudou-rag/data/knowledge.db"
+  openai:
+    base-url: "https://api.siliconflow.cn/v1"
+    token:
+    embedding-model: "BAAI/bge-large-zh-v1.5"
+
+modulechat:
+  openai:
+    base-url: "https://api.siliconflow.cn/v1"
+    token:
+    embedding-model: "BAAI/bge-large-zh-v1.5"
+#    model: "Qwen/Qwen2.5-7B-Instruct"
+    model: "Qwen/Qwen2.5-32B-Instruct"
+#    model: "Qwen/Qwen2.5-VL-32B-Instruct"

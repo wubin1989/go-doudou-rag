@@ -1,0 +1,38 @@
+{
+  "name": "playground-independent",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc -b && vite build",
+    "preview": "vite preview",
+    "pullknow": "pullcode -u http://admin:admin@localhost:6060/moduleknowledge/go-doudou/openapi.json -o src/api_know",
+    "pullchat": "pullcode -u http://admin:admin@localhost:6060/modulechat/go-doudou/openapi.json -o src/api_chat",
+    "pullauth": "pullcode -u http://admin:admin@localhost:6060/moduleauth/go-doudou/openapi.json -o src/api_auth"
+  },
+  "dependencies": {
+    "ant-design-vue": ">=4.0.0",
+    "ant-design-x-vue": "1.1.2",
+    "axios": "0.21.1",
+    "lodash-es": "^4.17.21",
+    "markdown-it": "^14.1.0",
+    "qs": "6.5.3",
+    "shiki": "^3.4.0",
+    "vue-router": "^4.5.1"
+  },
+  "devDependencies": {
+    "@types/lodash": "^4.14.123",
+    "@types/lodash-es": "^4.17.8",
+    "@types/markdown-it": "^14.1.2",
+    "@types/node": "^22.15.3",
+    "@types/qs": "^6.5.3",
+    "@vitejs/plugin-vue": "^5.1.4",
+    "@vitejs/plugin-vue-jsx": "^4.0.1",
+    "pullcode": "^1.2.3",
+    "typescript": "~5.8.0",
+    "unplugin-vue-macros": "^2.14.5",
+    "vite": "^5.4.8",
+    "vue-tsc": "^2.1.6"
+  }
+}
