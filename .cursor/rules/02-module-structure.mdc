@@ -1,0 +1,56 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# 模块结构
+
+## 通用模块结构
+
+每个功能模块通常包含以下目录结构：
+
+- `cmd/` - 命令行入口点
+- `config/` - 模块配置
+- `dto/` - 数据传输对象
+- `internal/` - 内部实现
+  - `dao/` - 数据访问层
+  - `model/` - 数据模型
+- `plugin/` - 插件扩展
+- `transport/` - 传输层
+  - `httpsrv/` - HTTP服务
+
+## 主要模块
+
+### 主模块 (main)
+
+主模块是应用程序的入口点：
+- `main/cmd/` - 包含主应用的入口点
+- `main/config/` - 包含主应用的配置
+
+### 认证模块 (module-auth)
+
+认证模块处理用户身份验证和授权：
+- `module-auth/dto/` - 认证相关数据传输对象
+- `module-auth/internal/` - 认证服务内部实现
+- `module-auth/transport/httpsrv/` - 认证服务HTTP API
+
+### 聊天模块 (module-chat)
+
+聊天模块实现RAG对话功能：
+- `module-chat/dto/` - 聊天相关数据传输对象
+- `module-chat/contextutil/` - 上下文工具
+- `module-chat/frontend/` - 前端实现
+- `module-chat/transport/httpsrv/` - 聊天服务HTTP API
+
+### 知识库模块 (module-knowledge)
+
+知识库模块管理文档和检索：
+- `module-knowledge/dto/` - 知识库相关数据传输对象
+- `module-knowledge/internal/` - 知识库服务内部实现
+- `module-knowledge/transport/httpsrv/` - 知识库服务HTTP API
+
+### 工具包 (toolkit)
+
+工具包提供共享功能：
+- `toolkit/auth/` - 认证相关工具
+- `toolkit/config/` - 配置相关工具

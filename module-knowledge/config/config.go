@@ -23,6 +23,7 @@ type Config struct {
 		BaseUrl        string
 		Token          string
 		EmbeddingModel string
+		Model          string
 	}
 	Db struct {
 		Dsn string

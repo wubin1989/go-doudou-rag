@@ -1,0 +1,30 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# go-doudou-rag项目概述
+
+这是一个基于go-doudou框架构建的RAG（检索增强生成）应用程序，采用微服务架构。
+
+## 主要模块
+
+项目由以下主要模块组成：
+
+1. **main** - 主应用入口点和配置
+2. **module-auth** - 认证服务，处理用户认证和授权
+3. **module-chat** - 聊天服务，提供基于RAG的对话功能和前端界面
+4. **module-knowledge** - 知识库服务，管理知识库和文档检索
+5. **toolkit** - 共享工具库，提供各模块共用的功能
+
+## 技术栈
+
+- **后端**: Go语言，go-doudou框架
+- **前端**: 位于module-chat/frontend目录
+- **数据存储**: 可能包括向量数据库和关系型数据库
+
+## 开发工作流
+
+使用go-doudou命令行工具进行开发：
+- `go-doudou work init .` - 初始化工作区
+- `go-doudou svc http --case snake` - 生成HTTP服务代码

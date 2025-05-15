@@ -1,0 +1,26 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# 前端结构
+
+前端应用位于`module-chat/frontend/`目录中，主要组织如下：
+
+## API 客户端
+
+- `api_auth/` - 认证服务API客户端
+- `api_chat/` - 聊天服务API客户端
+- `api_know/` - 知识库服务API客户端
+
+## 工具和配置
+
+- `constant/` - 常量定义
+- `enums/` - 枚举类型
+- `httputil/` - HTTP工具类
+- `router/` - 路由配置
+
+## 视图和组件
+
+- `views/` - 页面视图组件
+- `types/` - 类型定义

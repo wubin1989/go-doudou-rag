@@ -6,30 +6,37 @@ package service
 
 import (
 	"context"
-	"go-doudou-rag/module-knowledge/config"
-	"go-doudou-rag/module-knowledge/dto"
-	"go-doudou-rag/module-knowledge/internal/dao"
-	"go-doudou-rag/module-knowledge/internal/model"
+	"encoding/base64"
+	"fmt"
+	"image"
+	"image/color"
+	"image/png"
 	"io"
 	"log"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
 	"time"
 
-	"github.com/unionj-cloud/toolkit/stringutils"
-
+	"github.com/klippa-app/go-pdfium"
+	"github.com/klippa-app/go-pdfium/enums"
 	"github.com/klippa-app/go-pdfium/requests"
 	"github.com/klippa-app/go-pdfium/webassembly"
 	"github.com/lithammer/shortuuid/v4"
-	"github.com/spf13/cast"
-
-	"github.com/klippa-app/go-pdfium"
 	"github.com/philippgille/chromem-go"
 	"github.com/samber/lo"
+	"github.com/spf13/cast"
+	"github.com/tmc/langchaingo/llms/openai"
 	"github.com/tmc/langchaingo/schema"
 	"github.com/tmc/langchaingo/textsplitter"
 	v3 "github.com/unionj-cloud/toolkit/openapi/v3"
+	"github.com/unionj-cloud/toolkit/stringutils"
+
+	"go-doudou-rag/module-knowledge/config"
+	"go-doudou-rag/module-knowledge/dto"
+	"go-doudou-rag/module-knowledge/internal/dao"
+	"go-doudou-rag/module-knowledge/internal/model"
 )
 
 var pool pdfium.Pool
@@ -126,6 +133,114 @@ func (receiver *ModuleKnowledgeImpl) Upload(ctx context.Context, file v3.FileMod
 	var docs []schema.Document
 
 	for i := 0; i < pageCount.PageCount; i++ {
+		objCount, err := instance.FPDFPage_CountObjects(&requests.FPDFPage_CountObjects{
+			Page: requests.Page{
+				ByIndex: &requests.PageByIndex{
+					Document: doc.Document,
+					Index:    i,
+				},
+			},
+		})
+		if err != nil {
+			panic(err)
+		}
+
+		for j := 0; j < objCount.Count; j++ {
+			obj, err := instance.FPDFPage_GetObject(&requests.FPDFPage_GetObject{
+				Page: requests.Page{
+					ByIndex: &requests.PageByIndex{
+						Document: doc.Document,
+						Index:    i,
+					},
+				},
+				Index: j,
+			})
+			if err != nil {
+				panic(err)
+			}
+
+			objType, err := instance.FPDFPageObj_GetType(&requests.FPDFPageObj_GetType{
+				PageObject: obj.PageObject,
+			})
+			if err != nil {
+				panic(err)
+			}
+
+			if objType.Type == enums.FPDF_PAGEOBJ_IMAGE {
+				getBitmap, err := instance.FPDFImageObj_GetBitmap(&requests.FPDFImageObj_GetBitmap{
+					ImageObject: obj.PageObject,
+				})
+				if err != nil {
+					panic(err)
+				}
+
+				bitmapBuffer, err := instance.FPDFBitmap_GetBuffer(&requests.FPDFBitmap_GetBuffer{
+					Bitmap: getBitmap.Bitmap,
+				})
+				if err != nil {
+					panic(err)
+				}
+
+				output := filepath.Join(receiver.conf.Biz.FileSavePath, fmt.Sprintf("%d_%d.png", i, j))
+
+				getWidth, err := instance.FPDFBitmap_GetWidth(&requests.FPDFBitmap_GetWidth{
+					Bitmap: getBitmap.Bitmap,
+				})
+				if err != nil {
+					panic(err)
+				}
+
+				getHeight, err := instance.FPDFBitmap_GetHeight(&requests.FPDFBitmap_GetHeight{
+					Bitmap: getBitmap.Bitmap,
+				})
+				if err != nil {
+					panic(err)
+				}
+
+				getStride, err := instance.FPDFBitmap_GetStride(&requests.FPDFBitmap_GetStride{
+					Bitmap: getBitmap.Bitmap,
+				})
+				if err != nil {
+					panic(err)
+				}
+
+				getImageFilterCount, err := instance.FPDFImageObj_GetImageFilterCount(&requests.FPDFImageObj_GetImageFilterCount{
+					ImageObject: obj.PageObject,
+				})
+				if err != nil {
+					panic(err)
+				}
+				for k := 0; k < getImageFilterCount.Count; k++ {
+					getImageFilter, err := instance.FPDFImageObj_GetImageFilter(&requests.FPDFImageObj_GetImageFilter{
+						ImageObject: obj.PageObject,
+						Index:       k,
+					})
+					if err != nil {
+						panic(err)
+					}
+					fmt.Println(k, ":", getImageFilter.ImageFilter)
+				}
+
+				saveBitmapToPNG(bitmapBuffer.Buffer, int(getWidth.Width), int(getHeight.Height), output, getStride.Stride)
+
+				instance.FPDFBitmap_Destroy(&requests.FPDFBitmap_Destroy{
+					Bitmap: getBitmap.Bitmap,
+				})
+
+				//text := receiver.analyzeImageWithMultiModal(ctx, output)
+				//
+				//docs = append(docs, schema.Document{
+				//	PageContent: text,
+				//	Metadata: map[string]any{
+				//		"page":        i,
+				//		"total_pages": pageCount.PageCount,
+				//		"type":        "image",
+				//	},
+				//})
+			}
+		}
+
+		// 获取页面文本
 		pageText, err := instance.GetPageText(&requests.GetPageText{
 			Page: requests.Page{
 				ByIndex: &requests.PageByIndex{
@@ -143,6 +258,7 @@ func (receiver *ModuleKnowledgeImpl) Upload(ctx context.Context, file v3.FileMod
 			Metadata: map[string]any{
 				"page":        i,
 				"total_pages": pageCount.PageCount,
+				"type":        "text",
 			},
 		})
 	}
@@ -274,4 +390,86 @@ func (receiver *ModuleKnowledgeImpl) GetQuery(ctx context.Context, req dto.Query
 	})
 
 	return data, nil
+}
+
+// analyzeImageWithMultiModal 使用多模态大模型分析图片，提取文字并描述图片内容
+func (receiver *ModuleKnowledgeImpl) analyzeImageWithMultiModal(ctx context.Context, file string) string {
+
+	imgData, err := os.ReadFile(file)
+	if err != nil {
+		panic(err)
+	}
+
+	contentType := http.DetectContentType(imgData)
+
+	// 将图片转换为Base64
+	imgBase64 := base64.StdEncoding.EncodeToString(imgData)
+
+	// 初始化OpenAI客户端 (使用GPT-4 Vision或其他多模态模型)
+	// 从配置中获取API密钥
+	openaiClient, err := openai.New(
+		openai.WithBaseURL(receiver.conf.Openai.BaseUrl),
+		openai.WithToken(lo.Ternary(stringutils.IsNotEmpty(receiver.conf.Openai.Token), receiver.conf.Openai.Token, os.Getenv("OPENAI_API_KEY"))),
+		openai.WithEmbeddingModel(receiver.conf.Openai.EmbeddingModel),
+		openai.WithModel(receiver.conf.Openai.Model),
+	)
+
+	if err != nil {
+		panic(fmt.Errorf("初始化OpenAI客户端失败: %w", err))
+	}
+
+	// 创建包含图片的提示
+	// 注意: 这里的实现依赖于OpenAI的Vision API
+	// 其他模型可能需要不同的实现方式
+	prompt := fmt.Sprintf(`以下是一张图片。请执行两项任务:
+1. 如果图片包含任何文字，请提取并返回所有可见文字。
+2. 详细描述图片中显示的内容。
+
+请按以下格式返回:
+文字: [图片中的所有文字，如果没有则返回"无文字"]
+描述: [对图片内容的详细描述]
+
+图片数据: data:%s;base64,%s`, contentType, imgBase64)
+
+	// 发送请求到模型
+	response, err := openaiClient.Call(ctx, prompt)
+	if err != nil {
+		panic(fmt.Errorf("发送请求到模型失败: %w", err))
+	}
+
+	return response
+}
+
+func saveBitmapToPNG(rgba []byte, width, height int, filename string, stride int) {
+	// 创建RGBA图像
+	img := image.NewRGBA(image.Rect(0, 0, width, height))
+
+	// 遍历图像的每个像素
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			// 计算像素在缓冲区中的位置
+			i := y*stride + x*4
+
+			// PDFium使用BGRA格式，需要转换为RGBA
+			b := rgba[i+0]
+			g := rgba[i+1]
+			r := rgba[i+2]
+			a := rgba[i+3]
+
+			// 设置像素值
+			img.Set(x, y, color.RGBA{R: r, G: g, B: b, A: a})
+		}
+	}
+
+	// 创建输出文件
+	outFile, err := os.Create(filename)
+	if err != nil {
+		panic(err)
+	}
+	defer outFile.Close()
+
+	// 编码并保存
+	if err = png.Encode(outFile, img); err != nil {
+		panic(err)
+	}
 }

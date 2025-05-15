@@ -1,0 +1,47 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# 开发流程
+
+## 初始化和设置
+
+1. 克隆仓库并进入项目目录：
+   ```bash
+   cd go-doudou-rag
+   ```
+
+2. 初始化工作区：
+   ```bash
+   go-doudou work init .
+   ```
+
+3. 初始化新的服务模块：
+   ```bash
+   go-doudou svc init <module-name> -m go-doudou-rag/<module-name> --module --case snake -t rest
+   ```
+
+## 代码生成
+
+当更新服务定义后，生成HTTP服务代码：
+```bash
+go-doudou svc http --case snake
+```
+
+或者禁用自动修复导入以提高性能：
+```bash
+GDD_FIX_IMPORT=off go-doudou svc http --case snake
+```
+
+## 测试API
+
+可以使用curl测试聊天API：
+```bash
+curl -w '\n' -N -X POST 'http://localhost:6060/modulechat/chat' \
+--header 'Content-Type: application/json' \
+--header 'Authorization: Bearer <JWT_TOKEN>' \
+--data '{
+    "prompt": "问题示例"
+}'
+```

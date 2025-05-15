@@ -27,6 +27,7 @@ moduleknowledge:
     base-url: "https://api.siliconflow.cn/v1"
     token:
     embedding-model: "BAAI/bge-large-zh-v1.5"
+    model: "Qwen/Qwen2.5-VL-32B-Instruct"
 
 modulechat:
   openai:
