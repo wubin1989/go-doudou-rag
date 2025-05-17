@@ -5,28 +5,30 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"fmt"
-	"image"
-	"image/color"
-	"image/png"
 	"io"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/klippa-app/go-pdfium"
-	"github.com/klippa-app/go-pdfium/enums"
 	"github.com/klippa-app/go-pdfium/requests"
 	"github.com/klippa-app/go-pdfium/webassembly"
 	"github.com/lithammer/shortuuid/v4"
+	"github.com/pdfcpu/pdfcpu/pkg/api"
+	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu"
+	pdfmodel "github.com/pdfcpu/pdfcpu/pkg/pdfcpu/model"
 	"github.com/philippgille/chromem-go"
 	"github.com/samber/lo"
 	"github.com/spf13/cast"
+	"github.com/tmc/langchaingo/llms"
 	"github.com/tmc/langchaingo/llms/openai"
 	"github.com/tmc/langchaingo/schema"
 	"github.com/tmc/langchaingo/textsplitter"
@@ -111,6 +113,11 @@ func (receiver *ModuleKnowledgeImpl) Upload(ctx context.Context, file v3.FileMod
 		panic(err)
 	}
 
+	fileBytes, err := os.ReadFile(out)
+	if err != nil {
+		panic(err)
+	}
+
 	doc, err := instance.FPDF_LoadDocument(&requests.FPDF_LoadDocument{
 		Path: &out,
 	})
@@ -130,116 +137,10 @@ func (receiver *ModuleKnowledgeImpl) Upload(ctx context.Context, file v3.FileMod
 		panic(err)
 	}
 
+	fileName := strings.TrimSuffix(filepath.Base(out), ".pdf")
+
 	var docs []schema.Document
-
 	for i := 0; i < pageCount.PageCount; i++ {
-		objCount, err := instance.FPDFPage_CountObjects(&requests.FPDFPage_CountObjects{
-			Page: requests.Page{
-				ByIndex: &requests.PageByIndex{
-					Document: doc.Document,
-					Index:    i,
-				},
-			},
-		})
-		if err != nil {
-			panic(err)
-		}
-
-		for j := 0; j < objCount.Count; j++ {
-			obj, err := instance.FPDFPage_GetObject(&requests.FPDFPage_GetObject{
-				Page: requests.Page{
-					ByIndex: &requests.PageByIndex{
-						Document: doc.Document,
-						Index:    i,
-					},
-				},
-				Index: j,
-			})
-			if err != nil {
-				panic(err)
-			}
-
-			objType, err := instance.FPDFPageObj_GetType(&requests.FPDFPageObj_GetType{
-				PageObject: obj.PageObject,
-			})
-			if err != nil {
-				panic(err)
-			}
-
-			if objType.Type == enums.FPDF_PAGEOBJ_IMAGE {
-				getBitmap, err := instance.FPDFImageObj_GetBitmap(&requests.FPDFImageObj_GetBitmap{
-					ImageObject: obj.PageObject,
-				})
-				if err != nil {
-					panic(err)
-				}
-
-				bitmapBuffer, err := instance.FPDFBitmap_GetBuffer(&requests.FPDFBitmap_GetBuffer{
-					Bitmap: getBitmap.Bitmap,
-				})
-				if err != nil {
-					panic(err)
-				}
-
-				output := filepath.Join(receiver.conf.Biz.FileSavePath, fmt.Sprintf("%d_%d.png", i, j))
-
-				getWidth, err := instance.FPDFBitmap_GetWidth(&requests.FPDFBitmap_GetWidth{
-					Bitmap: getBitmap.Bitmap,
-				})
-				if err != nil {
-					panic(err)
-				}
-
-				getHeight, err := instance.FPDFBitmap_GetHeight(&requests.FPDFBitmap_GetHeight{
-					Bitmap: getBitmap.Bitmap,
-				})
-				if err != nil {
-					panic(err)
-				}
-
-				getStride, err := instance.FPDFBitmap_GetStride(&requests.FPDFBitmap_GetStride{
-					Bitmap: getBitmap.Bitmap,
-				})
-				if err != nil {
-					panic(err)
-				}
-
-				getImageFilterCount, err := instance.FPDFImageObj_GetImageFilterCount(&requests.FPDFImageObj_GetImageFilterCount{
-					ImageObject: obj.PageObject,
-				})
-				if err != nil {
-					panic(err)
-				}
-				for k := 0; k < getImageFilterCount.Count; k++ {
-					getImageFilter, err := instance.FPDFImageObj_GetImageFilter(&requests.FPDFImageObj_GetImageFilter{
-						ImageObject: obj.PageObject,
-						Index:       k,
-					})
-					if err != nil {
-						panic(err)
-					}
-					fmt.Println(k, ":", getImageFilter.ImageFilter)
-				}
-
-				saveBitmapToPNG(bitmapBuffer.Buffer, int(getWidth.Width), int(getHeight.Height), output, getStride.Stride)
-
-				instance.FPDFBitmap_Destroy(&requests.FPDFBitmap_Destroy{
-					Bitmap: getBitmap.Bitmap,
-				})
-
-				//text := receiver.analyzeImageWithMultiModal(ctx, output)
-				//
-				//docs = append(docs, schema.Document{
-				//	PageContent: text,
-				//	Metadata: map[string]any{
-				//		"page":        i,
-				//		"total_pages": pageCount.PageCount,
-				//		"type":        "image",
-				//	},
-				//})
-			}
-		}
-
 		// 获取页面文本
 		pageText, err := instance.GetPageText(&requests.GetPageText{
 			Page: requests.Page{
@@ -261,6 +162,40 @@ func (receiver *ModuleKnowledgeImpl) Upload(ctx context.Context, file v3.FileMod
 				"type":        "text",
 			},
 		})
+
+		var imageOutFile string
+		if err = api.ExtractImages(bytes.NewReader(fileBytes), []string{cast.ToString(i)}, func(img pdfmodel.Image, singleImgPerPage bool, maxPageDigits int) error {
+			if img.Reader == nil {
+				return nil
+			}
+			s := "%s_%" + fmt.Sprintf("0%dd", maxPageDigits)
+			qual := img.Name
+			if img.Thumb {
+				qual = "thumb"
+			}
+			f := fmt.Sprintf(s+"_%s.%s", fileName, img.PageNr, qual, img.FileType)
+			imageOutFile = filepath.Join(receiver.conf.Biz.FileSavePath, f)
+			return pdfcpu.WriteReader(imageOutFile, img)
+		}, nil); err != nil {
+			panic(err)
+		}
+
+		if stringutils.IsNotEmpty(imageOutFile) {
+			imageDescription := receiver.analyzeImageWithMultiModal(ctx, imageOutFile)
+
+			if stringutils.IsNotEmpty(imageDescription) {
+				docs = append(docs, schema.Document{
+					PageContent: imageDescription,
+					Metadata: map[string]any{
+						"page":        i,
+						"total_pages": pageCount.PageCount,
+						"file":        imageOutFile,
+						"type":        "image",
+					},
+				})
+			}
+		}
+
 	}
 
 	splitter := textsplitter.NewRecursiveCharacter(
@@ -307,6 +242,75 @@ func (receiver *ModuleKnowledgeImpl) Upload(ctx context.Context, file v3.FileMod
 	}, nil
 }
 
+func (receiver *ModuleKnowledgeImpl) extractContentFromPdf(ctx context.Context, file *model.File) (data string) {
+	doc, err := instance.FPDF_LoadDocument(&requests.FPDF_LoadDocument{
+		Path: &file.Path,
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	// Always close the document, this will release its resources.
+	defer instance.FPDF_CloseDocument(&requests.FPDF_CloseDocument{
+		Document: doc.Document,
+	})
+
+	pageCount, err := instance.FPDF_GetPageCount(&requests.FPDF_GetPageCount{
+		Document: doc.Document,
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	fileBytes, err := os.ReadFile(file.Path)
+	if err != nil {
+		panic(err)
+	}
+
+	fileName := strings.TrimSuffix(filepath.Base(file.Path), ".pdf")
+
+	var content string
+	for i := 0; i < pageCount.PageCount; i++ {
+		pageText, err := instance.GetPageText(&requests.GetPageText{
+			Page: requests.Page{
+				ByIndex: &requests.PageByIndex{
+					Document: doc.Document,
+					Index:    i,
+				},
+			},
+		})
+		if err != nil {
+			panic(err)
+		}
+
+		content += pageText.Text
+
+		var imageOutFile string
+		if err = api.ExtractImages(bytes.NewReader(fileBytes), []string{cast.ToString(i)}, func(img pdfmodel.Image, singleImgPerPage bool, maxPageDigits int) error {
+			if img.Reader == nil {
+				return nil
+			}
+			s := "%s_%" + fmt.Sprintf("0%dd", maxPageDigits)
+			qual := img.Name
+			if img.Thumb {
+				qual = "thumb"
+			}
+			f := fmt.Sprintf(s+"_%s.%s", fileName, img.PageNr, qual, img.FileType)
+			imageOutFile = filepath.Join(receiver.conf.Biz.FileSavePath, f)
+			return pdfcpu.WriteReader(imageOutFile, img)
+		}, nil); err != nil {
+			panic(err)
+		}
+
+		if stringutils.IsNotEmpty(imageOutFile) {
+			imageDescription := receiver.analyzeImageWithMultiModal(ctx, imageOutFile)
+			content += imageDescription
+		}
+	}
+
+	return content
+}
+
 func (receiver *ModuleKnowledgeImpl) GetList(ctx context.Context, req dto.GetListReq) (data []dto.FileDTO, _ error) {
 	fileRepo := dao.GetFileRepo()
 
@@ -320,40 +324,7 @@ func (receiver *ModuleKnowledgeImpl) GetList(ctx context.Context, req dto.GetLis
 		var content string
 
 		if req.WithContent {
-			doc, err := instance.FPDF_LoadDocument(&requests.FPDF_LoadDocument{
-				Path: &item.Path,
-			})
-			if err != nil {
-				panic(err)
-			}
-
-			// Always close the document, this will release its resources.
-			defer instance.FPDF_CloseDocument(&requests.FPDF_CloseDocument{
-				Document: doc.Document,
-			})
-
-			pageCount, err := instance.FPDF_GetPageCount(&requests.FPDF_GetPageCount{
-				Document: doc.Document,
-			})
-			if err != nil {
-				panic(err)
-			}
-
-			for i := 0; i < pageCount.PageCount; i++ {
-				pageText, err := instance.GetPageText(&requests.GetPageText{
-					Page: requests.Page{
-						ByIndex: &requests.PageByIndex{
-							Document: doc.Document,
-							Index:    i,
-						},
-					},
-				})
-				if err != nil {
-					panic(err)
-				}
-
-				content += pageText.Text
-			}
+			content = receiver.extractContentFromPdf(ctx, item)
 		}
 
 		data = append(data, dto.FileDTO{
@@ -371,12 +342,7 @@ func (receiver *ModuleKnowledgeImpl) GetQuery(ctx context.Context, req dto.Query
 		panic("empty text")
 	}
 
-	nResults := 1
-	if req.Top > 0 {
-		nResults = req.Top
-	}
-
-	res, err := receiver.collection.Query(ctx, req.Text, nResults, nil, nil)
+	res, err := receiver.collection.Query(ctx, req.Text, req.RetrieveLimit, nil, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -384,92 +350,185 @@ func (receiver *ModuleKnowledgeImpl) GetQuery(ctx context.Context, req dto.Query
 	lo.ForEach(res, func(item chromem.Result, index int) {
 		data = append(data, dto.QueryResult{
 			ID:         item.ID,
-			Similarity: cast.ToString(item.Similarity),
+			Similarity: item.Similarity,
 			Content:    item.Content,
 		})
 	})
 
+	data = lo.Filter(data, func(item dto.QueryResult, index int) bool {
+		return item.Similarity >= req.SimilarityThreshold
+	})
+
+	data = receiver.GetMMRResults(data, req.TopK, float64(req.Rerank.Lambda))
+
 	return data, nil
+}
+
+// GetMMRResults 使用最大边际相关性(MMR)算法从结果中选择topK条数据，平衡相关性和多样性
+// results: 初始查询结果
+// topK: 返回的结果数量
+// lambda: 控制相关性与多样性的权重参数(0-1)，越接近1越注重相关性，越接近0越注重多样性
+func (receiver *ModuleKnowledgeImpl) GetMMRResults(results []dto.QueryResult, topK int, lambda float64) []dto.QueryResult {
+	if topK <= 0 {
+		topK = 1
+	}
+
+	if lambda < 0 || lambda > 1 {
+		lambda = 0.5 // 默认值，平衡相关性和多样性
+	}
+
+	if len(results) <= topK {
+		return results
+	}
+
+	// 将相似度从字符串转换为浮点数
+	similarities := make([]float64, len(results))
+	for i, result := range results {
+		similarities[i] = cast.ToFloat64(result.Similarity)
+	}
+
+	// 初始化已选择和未选择的结果索引
+	selected := make([]int, 0, topK)
+	unselected := make([]int, len(results))
+	for i := range unselected {
+		unselected[i] = i
+	}
+
+	// 计算文本之间的相似度矩阵 (简化版，使用内容的余弦相似度)
+	// 实际应用中可以使用更复杂的相似度计算方法
+	simMatrix := make([][]float64, len(results))
+	for i := range simMatrix {
+		simMatrix[i] = make([]float64, len(results))
+		for j := range simMatrix[i] {
+			if i == j {
+				simMatrix[i][j] = 1.0 // 自身相似度为1
+			} else {
+				// 简化的内容相似度计算，实际应用中应使用嵌入向量计算余弦相似度
+				// 这里使用两个文档相似度平均值作为简化示例
+				simMatrix[i][j] = (similarities[i] + similarities[j]) / 2
+			}
+		}
+	}
+
+	// 选择第一个最相关的结果
+	maxIdx := 0
+	maxSim := similarities[0]
+	for i, sim := range similarities {
+		if sim > maxSim {
+			maxSim = sim
+			maxIdx = i
+		}
+	}
+
+	// 将第一个最相关的结果添加到已选择集合
+	selected = append(selected, maxIdx)
+	unselected = lo.Without(unselected, maxIdx)
+
+	// 迭代选择剩余的结果
+	for len(selected) < topK && len(unselected) > 0 {
+		maxMMRIdx := -1
+		maxMMR := -1.0
+
+		// 对每个未选择的结果计算MMR值
+		for _, i := range unselected {
+			// 相关性分数
+			relevance := similarities[i]
+
+			// 多样性分数：与已选择结果的最大相似度
+			maxSimilarity := 0.0
+			for _, j := range selected {
+				if simMatrix[i][j] > maxSimilarity {
+					maxSimilarity = simMatrix[i][j]
+				}
+			}
+
+			// 计算MMR分数
+			mmrScore := lambda*relevance - (1-lambda)*maxSimilarity
+
+			if mmrScore > maxMMR {
+				maxMMR = mmrScore
+				maxMMRIdx = i
+			}
+		}
+
+		// 添加具有最大MMR分数的结果
+		if maxMMRIdx != -1 {
+			selected = append(selected, maxMMRIdx)
+			unselected = lo.Without(unselected, maxMMRIdx)
+		}
+	}
+
+	// 返回选定的结果
+	mmrResults := make([]dto.QueryResult, 0, len(selected))
+	for _, idx := range selected {
+		mmrResults = append(mmrResults, results[idx])
+	}
+
+	return mmrResults
 }
 
 // analyzeImageWithMultiModal 使用多模态大模型分析图片，提取文字并描述图片内容
 func (receiver *ModuleKnowledgeImpl) analyzeImageWithMultiModal(ctx context.Context, file string) string {
+
+	// 初始化OpenAI客户端 (使用GPT-4 Vision或其他多模态模型)
+	// 从配置中获取API密钥
+	llm, err := openai.New(
+		openai.WithBaseURL(receiver.conf.Openai.BaseUrl),
+		openai.WithToken(lo.Ternary(stringutils.IsNotEmpty(receiver.conf.Openai.Token), receiver.conf.Openai.Token, os.Getenv("OPENAI_API_KEY"))),
+		openai.WithEmbeddingModel(receiver.conf.Openai.EmbeddingModel),
+		openai.WithModel(receiver.conf.Openai.Model),
+	)
+	if err != nil {
+		panic(fmt.Errorf("初始化OpenAI客户端失败: %w", err))
+	}
 
 	imgData, err := os.ReadFile(file)
 	if err != nil {
 		panic(err)
 	}
 
-	contentType := http.DetectContentType(imgData)
+	// {
+	//            "type": "image_url",
+	//            "image_url": {
+	//                "url": f"data:image/jpeg;base64,{base64_image}",
+	//                "detail":"low"
+	//            }
+	//        },
 
 	// 将图片转换为Base64
 	imgBase64 := base64.StdEncoding.EncodeToString(imgData)
-
-	// 初始化OpenAI客户端 (使用GPT-4 Vision或其他多模态模型)
-	// 从配置中获取API密钥
-	openaiClient, err := openai.New(
-		openai.WithBaseURL(receiver.conf.Openai.BaseUrl),
-		openai.WithToken(lo.Ternary(stringutils.IsNotEmpty(receiver.conf.Openai.Token), receiver.conf.Openai.Token, os.Getenv("OPENAI_API_KEY"))),
-		openai.WithEmbeddingModel(receiver.conf.Openai.EmbeddingModel),
-		openai.WithModel(receiver.conf.Openai.Model),
-	)
-
-	if err != nil {
-		panic(fmt.Errorf("初始化OpenAI客户端失败: %w", err))
-	}
+	contentType := http.DetectContentType(imgData)
+	imgUrl := fmt.Sprintf(`data:%s;base64,%s`, contentType, imgBase64)
 
 	// 创建包含图片的提示
 	// 注意: 这里的实现依赖于OpenAI的Vision API
 	// 其他模型可能需要不同的实现方式
-	prompt := fmt.Sprintf(`以下是一张图片。请执行两项任务:
+	prompt := fmt.Sprintf(`上面是一张图片。请执行两项任务:
 1. 如果图片包含任何文字，请提取并返回所有可见文字。
 2. 详细描述图片中显示的内容。
 
 请按以下格式返回:
-文字: [图片中的所有文字，如果没有则返回"无文字"]
-描述: [对图片内容的详细描述]
-
-图片数据: data:%s;base64,%s`, contentType, imgBase64)
+图片文字: [图片中的所有文字，如果没有则返回"无文字"]
+图片描述: [对图片内容的详细描述]`)
 
 	// 发送请求到模型
-	response, err := openaiClient.Call(ctx, prompt)
-	if err != nil {
-		panic(fmt.Errorf("发送请求到模型失败: %w", err))
+	content := []llms.MessageContent{
+		{
+			Role: llms.ChatMessageTypeHuman,
+			Parts: []llms.ContentPart{
+				llms.ImageURLPart(imgUrl),
+				llms.TextPart(prompt),
+			},
+		},
 	}
 
-	return response
-}
-
-func saveBitmapToPNG(rgba []byte, width, height int, filename string, stride int) {
-	// 创建RGBA图像
-	img := image.NewRGBA(image.Rect(0, 0, width, height))
-
-	// 遍历图像的每个像素
-	for y := 0; y < height; y++ {
-		for x := 0; x < width; x++ {
-			// 计算像素在缓冲区中的位置
-			i := y*stride + x*4
-
-			// PDFium使用BGRA格式，需要转换为RGBA
-			b := rgba[i+0]
-			g := rgba[i+1]
-			r := rgba[i+2]
-			a := rgba[i+3]
-
-			// 设置像素值
-			img.Set(x, y, color.RGBA{R: r, G: g, B: b, A: a})
-		}
-	}
-
-	// 创建输出文件
-	outFile, err := os.Create(filename)
+	contentResponse, err := llm.GenerateContent(ctx, content,
+		llms.WithMaxTokens(4096),
+		llms.WithTemperature(0.2),
+	)
 	if err != nil {
 		panic(err)
 	}
-	defer outFile.Close()
 
-	// 编码并保存
-	if err = png.Encode(outFile, img); err != nil {
-		panic(err)
-	}
+	return contentResponse.Choices[0].Content
 }

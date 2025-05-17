@@ -7,6 +7,7 @@ require (
 	github.com/glebarez/sqlite v1.11.0
 	github.com/klippa-app/go-pdfium v1.14.1
 	github.com/lithammer/shortuuid/v4 v4.0.0
+	github.com/pdfcpu/pdfcpu v0.10.2
 	github.com/philippgille/chromem-go v0.7.0
 	github.com/samber/do v1.6.0
 	github.com/samber/lo v1.39.0
@@ -116,6 +117,9 @@ require (
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/hashicorp/logutils v1.0.0 // indirect
+	github.com/hhrutter/lzw v1.0.0 // indirect
+	github.com/hhrutter/pkcs7 v0.2.0 // indirect
+	github.com/hhrutter/tiff v1.0.2 // indirect
 	github.com/hyperjumptech/jiffy v1.0.0 // indirect
 	github.com/iancoleman/strcase v0.3.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
@@ -255,6 +259,7 @@ require (
 	golang.org/x/arch v0.1.0 // indirect
 	golang.org/x/crypto v0.37.0 // indirect
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56 // indirect
+	golang.org/x/image v0.26.0 // indirect
 	golang.org/x/mod v0.24.0 // indirect
 	golang.org/x/net v0.39.0 // indirect
 	golang.org/x/sync v0.13.0 // indirect

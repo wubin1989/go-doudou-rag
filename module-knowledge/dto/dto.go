@@ -74,15 +74,23 @@ type UploadResult struct {
 	Id uint `json:"id" form:"id"`
 }
 
+type Rerank struct {
+	Strategy string  `json:"strategy" form:"strategy"`
+	Lambda   float32 `json:"lambda" form:"lambda"`
+}
+
 type QueryReq struct {
-	Text string `json:"text" form:"text"`
-	Top  int    `json:"top" form:"top"`
+	Text                string  `json:"text" form:"text"`
+	RetrieveLimit       int     `json:"retrieve_limit" form:"retrieve_limit"`
+	TopK                int     `json:"top_k" form:"top_k"`
+	SimilarityThreshold float32 `json:"similarity_threshold" form:"similarity_threshold"`
+	Rerank              Rerank  `json:"rerank" form:"rerank"`
 }
 
 type QueryResult struct {
-	ID         string `json:"id" form:"id"`
-	Similarity string `json:"similarity" form:"similarity"`
-	Content    string `json:"content" form:"content"`
+	ID         string  `json:"id" form:"id"`
+	Similarity float32 `json:"similarity" form:"similarity"`
+	Content    string  `json:"content" form:"content"`
 }
 
 type GetListReq struct {

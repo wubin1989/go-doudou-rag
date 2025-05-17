@@ -21,7 +21,6 @@ import (
 	"github.com/ascarter/requestid"
 	"github.com/samber/do"
 	"github.com/samber/lo"
-	"github.com/spf13/cast"
 	"github.com/tmc/langchaingo/llms"
 	"github.com/tmc/langchaingo/llms/openai"
 	"github.com/unionj-cloud/toolkit/zlogger"
@@ -84,8 +83,13 @@ func (receiver *ModuleChatImpl) Chat(ctx context.Context, req dto.ChatRequest) (
 
 	if stringutils.IsEmpty(req.FileId) {
 		queryResults, err := knowService.GetQuery(ctx, kdto.QueryReq{
-			Text: req.Prompt,
-			Top:  10,
+			Text:                req.Prompt,
+			RetrieveLimit:       1000,
+			TopK:                50,
+			SimilarityThreshold: 0.5,
+			Rerank: kdto.Rerank{
+				Lambda: 0.5,
+			},
 		})
 		if err != nil {
 			zlogger.Error().Err(err).Msgf("Query knowledge base failed, requestId: %s", requestID)
@@ -97,10 +101,6 @@ func (receiver *ModuleChatImpl) Chat(ctx context.Context, req dto.ChatRequest) (
 			writeSSEMessage(w, flusher, chunk)
 			return err
 		}
-
-		queryResults = lo.Filter(queryResults, func(item kdto.QueryResult, index int) bool {
-			return cast.ToFloat64(item.Similarity) >= 0.5
-		})
 
 		if len(queryResults) == 0 {
 			zlogger.Error().Msgf("Knowledge not found, requestId: %s", requestID)
