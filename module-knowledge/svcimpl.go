@@ -9,19 +9,21 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	concpool "github.com/sourcegraph/conc/pool"
+	"go-doudou-rag/toolkit/utils"
 	"io"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/klippa-app/go-pdfium"
 	"github.com/klippa-app/go-pdfium/requests"
 	"github.com/klippa-app/go-pdfium/webassembly"
-	"github.com/lithammer/shortuuid/v4"
 	"github.com/pdfcpu/pdfcpu/pkg/api"
 	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu"
 	pdfmodel "github.com/pdfcpu/pdfcpu/pkg/pdfcpu/model"
@@ -139,64 +141,92 @@ func (receiver *ModuleKnowledgeImpl) Upload(ctx context.Context, file v3.FileMod
 
 	fileName := strings.TrimSuffix(filepath.Base(out), ".pdf")
 
-	var docs []schema.Document
+	g := concpool.NewWithResults[[]schema.Document]().WithContext(ctx).WithCancelOnError()
+
 	for i := 0; i < pageCount.PageCount; i++ {
-		// 获取页面文本
-		pageText, err := instance.GetPageText(&requests.GetPageText{
-			Page: requests.Page{
-				ByIndex: &requests.PageByIndex{
-					Document: doc.Document,
-					Index:    i,
-				},
-			},
-		})
-		if err != nil {
-			panic(err)
-		}
+		g.Go(func(ctx context.Context) ([]schema.Document, error) {
 
-		docs = append(docs, schema.Document{
-			PageContent: pageText.Text,
-			Metadata: map[string]any{
-				"page":        i,
-				"total_pages": pageCount.PageCount,
-				"type":        "text",
-			},
-		})
+			var docs []schema.Document
 
-		var imageOutFile string
-		if err = api.ExtractImages(bytes.NewReader(fileBytes), []string{cast.ToString(i)}, func(img pdfmodel.Image, singleImgPerPage bool, maxPageDigits int) error {
-			if img.Reader == nil {
-				return nil
-			}
-			s := "%s_%" + fmt.Sprintf("0%dd", maxPageDigits)
-			qual := img.Name
-			if img.Thumb {
-				qual = "thumb"
-			}
-			f := fmt.Sprintf(s+"_%s.%s", fileName, img.PageNr, qual, img.FileType)
-			imageOutFile = filepath.Join(receiver.conf.Biz.FileSavePath, f)
-			return pdfcpu.WriteReader(imageOutFile, img)
-		}, nil); err != nil {
-			panic(err)
-		}
-
-		if stringutils.IsNotEmpty(imageOutFile) {
-			imageDescription := receiver.analyzeImageWithMultiModal(ctx, imageOutFile)
-
-			if stringutils.IsNotEmpty(imageDescription) {
-				docs = append(docs, schema.Document{
-					PageContent: imageDescription,
-					Metadata: map[string]any{
-						"page":        i,
-						"total_pages": pageCount.PageCount,
-						"file":        imageOutFile,
-						"type":        "image",
+			// 获取页面文本
+			pageText, err := instance.GetPageText(&requests.GetPageText{
+				Page: requests.Page{
+					ByIndex: &requests.PageByIndex{
+						Document: doc.Document,
+						Index:    i,
 					},
-				})
+				},
+			})
+			if err != nil {
+				panic(err)
 			}
-		}
+
+			docs = append(docs, schema.Document{
+				PageContent: pageText.Text,
+				Metadata: map[string]any{
+					"page":        i,
+					"total_pages": pageCount.PageCount,
+					"type":        "text",
+				},
+			})
+
+			var imageOutFile string
+			if err = api.ExtractImages(bytes.NewReader(fileBytes), []string{cast.ToString(i)}, func(img pdfmodel.Image, singleImgPerPage bool, maxPageDigits int) error {
+				if img.Reader == nil {
+					return nil
+				}
+				s := "%s_%" + fmt.Sprintf("0%dd", maxPageDigits)
+				qual := img.Name
+				if img.Thumb {
+					qual = "thumb"
+				}
+				f := fmt.Sprintf(s+"_%s.%s", fileName, img.PageNr, qual, img.FileType)
+				imageOutFile = filepath.Join(receiver.conf.Biz.FileSavePath, f)
+				return pdfcpu.WriteReader(imageOutFile, img)
+			}, nil); err != nil {
+				panic(err)
+			}
+
+			if stringutils.IsNotEmpty(imageOutFile) {
+				imageDescription := receiver.analyzeImageWithMultiModal(ctx, imageOutFile)
+
+				if stringutils.IsNotEmpty(imageDescription) {
+					docs = append(docs, schema.Document{
+						PageContent: imageDescription,
+						Metadata: map[string]any{
+							"page":        i,
+							"total_pages": pageCount.PageCount,
+							"file":        imageOutFile,
+							"type":        "image",
+						},
+					})
+				}
+			}
+
+			return docs, nil
+		})
 
 	}
+
+	groups, err := g.Wait()
+	if err != nil {
+		panic(err)
+	}
+
+	if len(groups) == 0 {
+		panic("内容为空")
+	}
+
+	var docs []schema.Document
+	lo.ForEach(groups, func(items []schema.Document, index int) {
+		docs = append(docs, items...)
+	})
+
+	sort.SliceStable(docs, func(i, j int) bool {
+		pageNoI := cast.ToInt(docs[i].Metadata["page"])
+		pageNoJ := cast.ToInt(docs[j].Metadata["page"])
+		return pageNoI < pageNoJ
+	})
 
 	splitter := textsplitter.NewRecursiveCharacter(
 		textsplitter.WithChunkSize(500),
@@ -218,7 +248,7 @@ func (receiver *ModuleKnowledgeImpl) Upload(ctx context.Context, file v3.FileMod
 		metadata["file"] = out
 
 		documents = append(documents, chromem.Document{
-			ID:       shortuuid.New(),
+			ID:       utils.GenerateBase64URLSafeSHA256ID(item.PageContent),
 			Content:  item.PageContent,
 			Metadata: metadata,
 		})
@@ -342,129 +372,27 @@ func (receiver *ModuleKnowledgeImpl) GetQuery(ctx context.Context, req dto.Query
 		panic("empty text")
 	}
 
-	res, err := receiver.collection.Query(ctx, req.Text, req.RetrieveLimit, nil, nil)
+	nResults := req.RetrieveLimit
+	if nResults > receiver.collection.Count() {
+		nResults = receiver.collection.Count()
+	}
+
+	res, err := receiver.collection.Query(ctx, req.Text, nResults, nil, nil)
 	if err != nil {
 		panic(err)
 	}
 
 	lo.ForEach(res, func(item chromem.Result, index int) {
-		data = append(data, dto.QueryResult{
-			ID:         item.ID,
-			Similarity: item.Similarity,
-			Content:    item.Content,
-		})
+		if item.Similarity >= req.SimilarityThreshold {
+			data = append(data, dto.QueryResult{
+				ID:         item.ID,
+				Similarity: item.Similarity,
+				Content:    item.Content,
+			})
+		}
 	})
-
-	data = lo.Filter(data, func(item dto.QueryResult, index int) bool {
-		return item.Similarity >= req.SimilarityThreshold
-	})
-
-	data = receiver.GetMMRResults(data, req.TopK, float64(req.Rerank.Lambda))
 
 	return data, nil
-}
-
-// GetMMRResults 使用最大边际相关性(MMR)算法从结果中选择topK条数据，平衡相关性和多样性
-// results: 初始查询结果
-// topK: 返回的结果数量
-// lambda: 控制相关性与多样性的权重参数(0-1)，越接近1越注重相关性，越接近0越注重多样性
-func (receiver *ModuleKnowledgeImpl) GetMMRResults(results []dto.QueryResult, topK int, lambda float64) []dto.QueryResult {
-	if topK <= 0 {
-		topK = 1
-	}
-
-	if lambda < 0 || lambda > 1 {
-		lambda = 0.5 // 默认值，平衡相关性和多样性
-	}
-
-	if len(results) <= topK {
-		return results
-	}
-
-	// 将相似度从字符串转换为浮点数
-	similarities := make([]float64, len(results))
-	for i, result := range results {
-		similarities[i] = cast.ToFloat64(result.Similarity)
-	}
-
-	// 初始化已选择和未选择的结果索引
-	selected := make([]int, 0, topK)
-	unselected := make([]int, len(results))
-	for i := range unselected {
-		unselected[i] = i
-	}
-
-	// 计算文本之间的相似度矩阵 (简化版，使用内容的余弦相似度)
-	// 实际应用中可以使用更复杂的相似度计算方法
-	simMatrix := make([][]float64, len(results))
-	for i := range simMatrix {
-		simMatrix[i] = make([]float64, len(results))
-		for j := range simMatrix[i] {
-			if i == j {
-				simMatrix[i][j] = 1.0 // 自身相似度为1
-			} else {
-				// 简化的内容相似度计算，实际应用中应使用嵌入向量计算余弦相似度
-				// 这里使用两个文档相似度平均值作为简化示例
-				simMatrix[i][j] = (similarities[i] + similarities[j]) / 2
-			}
-		}
-	}
-
-	// 选择第一个最相关的结果
-	maxIdx := 0
-	maxSim := similarities[0]
-	for i, sim := range similarities {
-		if sim > maxSim {
-			maxSim = sim
-			maxIdx = i
-		}
-	}
-
-	// 将第一个最相关的结果添加到已选择集合
-	selected = append(selected, maxIdx)
-	unselected = lo.Without(unselected, maxIdx)
-
-	// 迭代选择剩余的结果
-	for len(selected) < topK && len(unselected) > 0 {
-		maxMMRIdx := -1
-		maxMMR := -1.0
-
-		// 对每个未选择的结果计算MMR值
-		for _, i := range unselected {
-			// 相关性分数
-			relevance := similarities[i]
-
-			// 多样性分数：与已选择结果的最大相似度
-			maxSimilarity := 0.0
-			for _, j := range selected {
-				if simMatrix[i][j] > maxSimilarity {
-					maxSimilarity = simMatrix[i][j]
-				}
-			}
-
-			// 计算MMR分数
-			mmrScore := lambda*relevance - (1-lambda)*maxSimilarity
-
-			if mmrScore > maxMMR {
-				maxMMR = mmrScore
-				maxMMRIdx = i
-			}
-		}
-
-		// 添加具有最大MMR分数的结果
-		if maxMMRIdx != -1 {
-			selected = append(selected, maxMMRIdx)
-			unselected = lo.Without(unselected, maxMMRIdx)
-		}
-	}
-
-	// 返回选定的结果
-	mmrResults := make([]dto.QueryResult, 0, len(selected))
-	for _, idx := range selected {
-		mmrResults = append(mmrResults, results[idx])
-	}
-
-	return mmrResults
 }
 
 // analyzeImageWithMultiModal 使用多模态大模型分析图片，提取文字并描述图片内容

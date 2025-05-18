@@ -85,11 +85,7 @@ func (receiver *ModuleChatImpl) Chat(ctx context.Context, req dto.ChatRequest) (
 		queryResults, err := knowService.GetQuery(ctx, kdto.QueryReq{
 			Text:                req.Prompt,
 			RetrieveLimit:       1000,
-			TopK:                50,
 			SimilarityThreshold: 0.5,
-			Rerank: kdto.Rerank{
-				Lambda: 0.5,
-			},
 		})
 		if err != nil {
 			zlogger.Error().Err(err).Msgf("Query knowledge base failed, requestId: %s", requestID)

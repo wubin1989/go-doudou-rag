@@ -204,6 +204,7 @@ require (
 	github.com/skeema/knownhosts v1.3.1 // indirect
 	github.com/slok/goresilience v0.2.0 // indirect
 	github.com/sorairolake/lzip-go v0.3.5 // indirect
+	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/spf13/afero v1.10.0 // indirect
 	github.com/spf13/cobra v1.7.0 // indirect
 	github.com/spf13/jwalterweatherman v1.0.0 // indirect

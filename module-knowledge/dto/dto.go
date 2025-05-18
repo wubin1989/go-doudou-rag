@@ -82,9 +82,7 @@ type Rerank struct {
 type QueryReq struct {
 	Text                string  `json:"text" form:"text"`
 	RetrieveLimit       int     `json:"retrieve_limit" form:"retrieve_limit"`
-	TopK                int     `json:"top_k" form:"top_k"`
 	SimilarityThreshold float32 `json:"similarity_threshold" form:"similarity_threshold"`
-	Rerank              Rerank  `json:"rerank" form:"rerank"`
 }
 
 type QueryResult struct {

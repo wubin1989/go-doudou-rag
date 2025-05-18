@@ -25,7 +25,7 @@ import {
   Welcome,
   XStream,
 } from 'ant-design-x-vue'
-import { computed, h, ref, watch, onUnmounted, onMounted } from 'vue'
+import { computed, h, ref, watch, onUnmounted, onMounted, nextTick, defineComponent } from 'vue'
 import { uploadService } from '@/api_know/UploadService'
 import { TokenService } from '@/httputil/TokenService'
 import MarkdownIt from 'markdown-it'
@@ -137,11 +137,7 @@ const renderMarkdown = (content: string) => {
 const roles: BubbleListProps['roles'] = {
   ai: {
     placement: 'start',
-    typing: {
-      step: 2,           // 每次添加2个字符
-      interval: 30,      // 每30毫秒添加一次
-      suffix: h('span', { style: { marginLeft: '2px', animation: 'cursor-blink 0.8s infinite' } }, '|') // 添加闪烁光标
-    },
+    typing: false,
     styles: {
       content: {
         borderRadius: '16px',
@@ -150,7 +146,6 @@ const roles: BubbleListProps['roles'] = {
         lineHeight: '1.5',
       },
     },
-    // 自定义loading样式
     loadingRender: () => h('div', { 
       style: { 
         padding: '0 8px',
@@ -212,9 +207,14 @@ const attachedFiles = ref<AttachmentsProps['items']>([])
 const uploadedFileIds = ref<string[]>([]) // 存储已上传文件的ID列表
 const agentRequestLoading = ref(false)
 const abortController = ref<AbortController | null>(null)
+// 移除对流的全局引用，改为依赖AbortController
+const isRequestCancelled = ref(false) // 跟踪请求是否被取消
+// 添加字典来跟踪每条消息的打字效果状态
+const typingCompleted = ref<Record<string, boolean>>({})
 
 // 清理函数
 onUnmounted(() => {
+  // 确保取消所有进行中的请求
   if (abortController.value) {
     abortController.value.abort()
   }
@@ -232,6 +232,8 @@ const [agent] = useXAgent({
 
     // 创建新的AbortController
     abortController.value = new AbortController()
+    // 重置取消标志
+    isRequestCancelled.value = false
 
     try {
       // 获取文件ID字符串，多个文件ID使用英文逗号拼接
@@ -268,13 +270,18 @@ const [agent] = useXAgent({
       const stream = XStream({
         readableStream: response.body
       })
-
+      
       // 收集完整内容
       let fullContent = ''
 
       try {
         // 使用stream迭代器处理数据块
         for await (const chunk of stream) {
+          // 如果请求已被取消，不再处理数据
+          if (isRequestCancelled.value) {
+            break
+          }
+
           try {
             if (!chunk || !chunk.data) continue
 
@@ -296,7 +303,7 @@ const [agent] = useXAgent({
         console.error('Error reading stream:', error)
         throw error
       } finally {
-        stream.cancel()
+        // 不尝试取消流，因为流可能是锁定状态
       }
     } catch (error: any) {
       console.error('SSE错误:', error)
@@ -347,6 +354,10 @@ function onSubmit(nextContent: string) {
 
 // 取消流式输出
 function onCancel() {
+  // 设置取消标志
+  isRequestCancelled.value = true
+  
+  // 取消请求
   if (abortController.value) {
     abortController.value.abort()
   }
@@ -407,18 +418,95 @@ const handleUpload = async (file: any) => {
   }
 }
 
+// 自定义打字机组件
+const TypingText = defineComponent({
+  name: 'TypingText',
+  props: {
+    text: {
+      type: String,
+      required: true
+    },
+    speed: {
+      type: Number,
+      default: 30
+    },
+    onComplete: {
+      type: Function,
+      default: () => {}
+    }
+  },
+  setup(props, { emit }) {
+    const displayText = ref('');
+    const isTyping = ref(true);
+    const charIndex = ref(0);
+    const blinkCursor = ref(true);
+    
+    // 打字效果
+    const typeNextChar = () => {
+      if (charIndex.value < props.text.length) {
+        // 一次添加2个字符，加快速度
+        const charsToAdd = Math.min(2, props.text.length - charIndex.value);
+        displayText.value += props.text.substring(charIndex.value, charIndex.value + charsToAdd);
+        charIndex.value += charsToAdd;
+        
+        setTimeout(typeNextChar, props.speed);
+      } else {
+        isTyping.value = false;
+        blinkCursor.value = false;
+        props.onComplete();
+      }
+    };
+    
+    // 监听text变化，重新开始打字
+    watch(() => props.text, () => {
+      displayText.value = '';
+      charIndex.value = 0;
+      isTyping.value = true;
+      blinkCursor.value = true;
+      
+      if (props.text) {
+        setTimeout(typeNextChar, props.speed);
+      }
+    }, { immediate: true });
+    
+    return () => {
+      return h('div', { class: 'typing-container' }, [
+        h('span', displayText.value),
+        isTyping.value ? h('span', { 
+          class: 'typing-cursor',
+          style: {
+            display: blinkCursor.value ? 'inline-block' : 'none',
+            marginLeft: '2px',
+            animation: 'cursor-blink 0.8s infinite'
+          }
+        }, '|') : null
+      ]);
+    };
+  }
+});
+
 const items = computed<BubbleListProps['items']>(() => {
   return messages.value.map(({ id, message, status }) => {
     if (status !== 'local') {
-      // 对AI消息使用Markdown渲染
+      // 检查此消息是否已完成打字效果
+      const isTypingDone = typingCompleted.value[id] || false;
+      
       return {
         key: id,
         loading: status === 'loading',
         role: 'ai',
-        content: h('div', {
-          class: 'markdown-content',
-          innerHTML: renderMarkdown(message)
-        })
+        // 指定content为HTML或纯文本
+        content: isTypingDone 
+          ? h('div', { 
+              class: 'markdown-content',
+              innerHTML: renderMarkdown(message)
+            })
+          : h(TypingText, { 
+              text: message,
+              onComplete: () => {
+                typingCompleted.value[id] = true;
+              }
+            })
       }
     }
     
@@ -816,5 +904,29 @@ html, body {
   border-radius: 3px;
   font-size: 0.9em;
   font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
+}
+
+/* 打字机效果样式 */
+.typing-container {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    'Noto Sans', sans-serif;
+  line-height: 1.6;
+  word-wrap: break-word;
+}
+
+.typing-cursor {
+  display: inline-block;
+  opacity: 1;
+  margin-left: 2px;
+  animation: cursor-blink 0.8s infinite;
+}
+
+@keyframes cursor-blink {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
 }
 </style>

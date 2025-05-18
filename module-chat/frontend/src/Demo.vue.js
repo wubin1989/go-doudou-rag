@@ -1,7 +1,7 @@
 import { CloudUploadOutlined, PaperClipOutlined, PlusOutlined, } from '@ant-design/icons-vue';
 import { Badge, Button, Flex, Typography, theme, message } from 'ant-design-vue';
 import { Attachments, Bubble, Conversations, Sender, useXAgent, useXChat, XStream, } from 'ant-design-x-vue';
-import { computed, h, ref, watch, onUnmounted, onMounted } from 'vue';
+import { computed, h, ref, watch, onUnmounted, onMounted, defineComponent } from 'vue';
 import { uploadService } from '@/api_know/UploadService';
 import { TokenService } from '@/httputil/TokenService';
 import MarkdownIt from 'markdown-it';
@@ -108,11 +108,7 @@ const renderMarkdown = (content) => {
 const roles = {
     ai: {
         placement: 'start',
-        typing: {
-            step: 2, // 每次添加2个字符
-            interval: 30, // 每30毫秒添加一次
-            suffix: h('span', { style: { marginLeft: '2px', animation: 'cursor-blink 0.8s infinite' } }, '|') // 添加闪烁光标
-        },
+        typing: false,
         styles: {
             content: {
                 borderRadius: '16px',
@@ -121,7 +117,6 @@ const roles = {
                 lineHeight: '1.5',
             },
         },
-        // 自定义loading样式
         loadingRender: () => h('div', {
             style: {
                 padding: '0 8px',
@@ -182,8 +177,13 @@ const attachedFiles = ref([]);
 const uploadedFileIds = ref([]); // 存储已上传文件的ID列表
 const agentRequestLoading = ref(false);
 const abortController = ref(null);
+// 移除对流的全局引用，改为依赖AbortController
+const isRequestCancelled = ref(false); // 跟踪请求是否被取消
+// 添加字典来跟踪每条消息的打字效果状态
+const typingCompleted = ref({});
 // 清理函数
 onUnmounted(() => {
+    // 确保取消所有进行中的请求
     if (abortController.value) {
         abortController.value.abort();
     }
@@ -198,6 +198,8 @@ const [agent] = useXAgent({
         }
         // 创建新的AbortController
         abortController.value = new AbortController();
+        // 重置取消标志
+        isRequestCancelled.value = false;
         try {
             // 获取文件ID字符串，多个文件ID使用英文逗号拼接
             const fileIdStr = uploadedFileIds.value.join(',');
@@ -234,6 +236,10 @@ const [agent] = useXAgent({
             try {
                 // 使用stream迭代器处理数据块
                 for await (const chunk of stream) {
+                    // 如果请求已被取消，不再处理数据
+                    if (isRequestCancelled.value) {
+                        break;
+                    }
                     try {
                         if (!chunk || !chunk.data)
                             continue;
@@ -256,7 +262,7 @@ const [agent] = useXAgent({
                 throw error;
             }
             finally {
-                stream.cancel();
+                // 不尝试取消流，因为流可能是锁定状态
             }
         }
         catch (error) {
@@ -304,6 +310,9 @@ function onSubmit(nextContent) {
 }
 // 取消流式输出
 function onCancel() {
+    // 设置取消标志
+    isRequestCancelled.value = true;
+    // 取消请求
     if (abortController.value) {
         abortController.value.abort();
     }
@@ -358,18 +367,89 @@ const handleUpload = async (file) => {
         return false;
     }
 };
+// 自定义打字机组件
+const TypingText = defineComponent({
+    name: 'TypingText',
+    props: {
+        text: {
+            type: String,
+            required: true
+        },
+        speed: {
+            type: Number,
+            default: 30
+        },
+        onComplete: {
+            type: Function,
+            default: () => { }
+        }
+    },
+    setup(props, { emit }) {
+        const displayText = ref('');
+        const isTyping = ref(true);
+        const charIndex = ref(0);
+        const blinkCursor = ref(true);
+        // 打字效果
+        const typeNextChar = () => {
+            if (charIndex.value < props.text.length) {
+                // 一次添加2个字符，加快速度
+                const charsToAdd = Math.min(2, props.text.length - charIndex.value);
+                displayText.value += props.text.substring(charIndex.value, charIndex.value + charsToAdd);
+                charIndex.value += charsToAdd;
+                setTimeout(typeNextChar, props.speed);
+            }
+            else {
+                isTyping.value = false;
+                blinkCursor.value = false;
+                props.onComplete();
+            }
+        };
+        // 监听text变化，重新开始打字
+        watch(() => props.text, () => {
+            displayText.value = '';
+            charIndex.value = 0;
+            isTyping.value = true;
+            blinkCursor.value = true;
+            if (props.text) {
+                setTimeout(typeNextChar, props.speed);
+            }
+        }, { immediate: true });
+        return () => {
+            return h('div', { class: 'typing-container' }, [
+                h('span', displayText.value),
+                isTyping.value ? h('span', {
+                    class: 'typing-cursor',
+                    style: {
+                        display: blinkCursor.value ? 'inline-block' : 'none',
+                        marginLeft: '2px',
+                        animation: 'cursor-blink 0.8s infinite'
+                    }
+                }, '|') : null
+            ]);
+        };
+    }
+});
 const items = computed(() => {
     return messages.value.map(({ id, message, status }) => {
         if (status !== 'local') {
-            // 对AI消息使用Markdown渲染
+            // 检查此消息是否已完成打字效果
+            const isTypingDone = typingCompleted.value[id] || false;
             return {
                 key: id,
                 loading: status === 'loading',
                 role: 'ai',
-                content: h('div', {
-                    class: 'markdown-content',
-                    innerHTML: renderMarkdown(message)
-                })
+                // 指定content为HTML或纯文本
+                content: isTypingDone
+                    ? h('div', {
+                        class: 'markdown-content',
+                        innerHTML: renderMarkdown(message)
+                    })
+                    : h(TypingText, {
+                        text: message,
+                        onComplete: () => {
+                            typingCompleted.value[id] = true;
+                        }
+                    })
             };
         }
         return {
