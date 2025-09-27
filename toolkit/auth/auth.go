@@ -3,15 +3,16 @@ package auth
 import (
 	"context"
 	"fmt"
-	"github.com/golang-jwt/jwt/v5"
-	"github.com/unionj-cloud/go-doudou/v2/framework"
-	"github.com/unionj-cloud/go-doudou/v2/framework/rest/httprouter"
-	"github.com/unionj-cloud/toolkit/copier"
 	"go-doudou-rag/toolkit/config"
 	"net/http"
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/unionj-cloud/go-doudou/v2/framework"
+	"github.com/unionj-cloud/go-doudou/v2/framework/rest/httprouter"
+	"github.com/unionj-cloud/toolkit/copier"
 )
 
 var authMiddleware *AuthMiddleware
@@ -73,7 +74,7 @@ func (auth *AuthMiddleware) JwtToken(userInfo UserInfo) (token string, expire ti
 
 func (auth *AuthMiddleware) Jwt(inner http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.Contains(r.URL.Path, "/go-doudou/") || strings.Contains(r.URL.Path, "/") {
+		if strings.Contains(r.URL.Path, "/go-doudou/") || !strings.HasPrefix(r.URL.Path, "/module") {
 			inner.ServeHTTP(w, r)
 			return
 		}

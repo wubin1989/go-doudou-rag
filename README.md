@@ -10,7 +10,7 @@
 ```shell
 curl -w '\n' -N -X POST 'http://localhost:6060/modulechat/chat' \
 --header 'Content-Type: application/json' \
---header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NDY0MTQ0NzYsInVzZXJuYW1lIjoiYWRtaW4ifQ.hli_WvAIOfeTHQa6YV5BqxEtuOXx-VKZ6Mvao8B8iH0' \
+--header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NTg5ODkzNDgsInVzZXJuYW1lIjoiYWRtaW4ifQ.Jq7wbyLTTEZqqSOst-PBy-bjQpyj4GQBJlx-qX9GHaY' \
 --data '{
     "prompt": "最近杭州出台了什么经济相关的政策？"
 }'
@@ -19,7 +19,7 @@ curl -w '\n' -N -X POST 'http://localhost:6060/modulechat/chat' \
 ```shell
 curl -w '\n' -N -X POST 'http://localhost:6060/modulechat/chat' \
 --header 'Content-Type: application/json' \
---header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NDU4OTM4MTMsInVzZXJuYW1lIjoiYWRtaW4ifQ.EjxDfrMMHmOCvt557H8rd5sn9zX-uYOytw4OKH-jLJ8' \
+--header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NTg5ODkzNDgsInVzZXJuYW1lIjoiYWRtaW4ifQ.Jq7wbyLTTEZqqSOst-PBy-bjQpyj4GQBJlx-qX9GHaY' \
 --data '{
     "prompt": "Java的最新版本是哪个？"            
 }'

@@ -1,0 +1,9 @@
+go 1.25.1
+
+use (
+	./main
+	./module-auth
+	./module-chat
+	./module-knowledge
+	./toolkit
+)

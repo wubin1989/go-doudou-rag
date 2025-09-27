@@ -5,6 +5,7 @@ go 1.24.2
 require (
 	github.com/bytedance/sonic v1.13.2
 	github.com/glebarez/sqlite v1.11.0
+	github.com/ovechkin-dm/go-dyno v0.5.3
 	github.com/unionj-cloud/go-doudou/v2 v2.5.10-0.20250513123447-d49c3eaed91b
 	github.com/unionj-cloud/toolkit v0.0.7-0.20250511143810-22755c81f8cd
 	google.golang.org/grpc v1.72.0

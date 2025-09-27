@@ -7,7 +7,6 @@ require (
 	github.com/bytedance/sonic v1.13.2
 	github.com/samber/do v1.6.0
 	github.com/samber/lo v1.39.0
-	github.com/spf13/cast v1.3.1
 	github.com/tmc/langchaingo v0.1.13
 	github.com/unionj-cloud/go-doudou/v2 v2.5.10-0.20250513123447-d49c3eaed91b
 	github.com/unionj-cloud/toolkit v0.0.7-0.20250511143810-22755c81f8cd
@@ -193,6 +192,7 @@ require (
 	github.com/slok/goresilience v0.2.0 // indirect
 	github.com/sorairolake/lzip-go v0.3.5 // indirect
 	github.com/spf13/afero v1.10.0 // indirect
+	github.com/spf13/cast v1.3.1 // indirect
 	github.com/spf13/cobra v1.7.0 // indirect
 	github.com/spf13/jwalterweatherman v1.0.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect

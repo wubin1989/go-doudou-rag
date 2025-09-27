@@ -14,15 +14,15 @@ toolkit:
 moduleauth:
   db:
 #    dsn: ":memory:"
-    dsn: "/Users/wubin1989/workspace/cloud/unionj-cloud/go-doudou-rag/data/auth.db"
+    dsn: "E:/workspace/go-doudou-rag/data/auth.db"
 
 moduleknowledge:
   biz:
-    file-save-path: "/Users/wubin1989/workspace/cloud/unionj-cloud/go-doudou-rag/data/files"
+    file-save-path: "E:/workspace/go-doudou-rag/data/files"
     vector-store:
-      export-to-file: "/Users/wubin1989/workspace/cloud/unionj-cloud/go-doudou-rag/data/chromem-go.gob"
+      export-to-file: "E:/workspace/go-doudou-rag/data/chromem-go.gob"
   db:
-    dsn: "/Users/wubin1989/workspace/cloud/unionj-cloud/go-doudou-rag/data/knowledge.db"
+    dsn: "E:/workspace/go-doudou-rag/data/knowledge.db"
   openai:
     base-url: "https://api.siliconflow.cn/v1"
     token:

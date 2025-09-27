@@ -6,11 +6,11 @@ require (
 	github.com/bytedance/sonic v1.13.2
 	github.com/glebarez/sqlite v1.11.0
 	github.com/klippa-app/go-pdfium v1.14.1
-	github.com/lithammer/shortuuid/v4 v4.0.0
 	github.com/pdfcpu/pdfcpu v0.10.2
 	github.com/philippgille/chromem-go v0.7.0
 	github.com/samber/do v1.6.0
 	github.com/samber/lo v1.39.0
+	github.com/sourcegraph/conc v0.3.0
 	github.com/spf13/cast v1.3.1
 	github.com/tmc/langchaingo v0.1.13
 	github.com/unionj-cloud/go-doudou/v2 v2.5.10-0.20250513123447-d49c3eaed91b
@@ -142,6 +142,7 @@ require (
 	github.com/klauspost/cpuid/v2 v2.2.5 // indirect
 	github.com/klauspost/pgzip v1.2.6 // indirect
 	github.com/leodido/go-urn v1.2.1 // indirect
+	github.com/lithammer/shortuuid/v4 v4.0.0 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
@@ -204,7 +205,6 @@ require (
 	github.com/skeema/knownhosts v1.3.1 // indirect
 	github.com/slok/goresilience v0.2.0 // indirect
 	github.com/sorairolake/lzip-go v0.3.5 // indirect
-	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/spf13/afero v1.10.0 // indirect
 	github.com/spf13/cobra v1.7.0 // indirect
 	github.com/spf13/jwalterweatherman v1.0.0 // indirect

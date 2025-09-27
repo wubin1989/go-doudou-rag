@@ -5,20 +5,24 @@
 package plugin
 
 import (
+	"fmt"
+	service "go-doudou-rag/module-auth"
+	"go-doudou-rag/module-auth/config"
+	"go-doudou-rag/module-auth/internal/aop"
+	"go-doudou-rag/module-auth/internal/dao"
+	"go-doudou-rag/module-auth/internal/model"
+	"go-doudou-rag/module-auth/transport/httpsrv"
+	"os"
+
 	"github.com/glebarez/sqlite"
+	"github.com/ovechkin-dm/go-dyno/pkg/dyno"
 	"github.com/unionj-cloud/go-doudou/v2/framework/grpcx"
 	"github.com/unionj-cloud/go-doudou/v2/framework/plugin"
 	"github.com/unionj-cloud/go-doudou/v2/framework/rest"
 	"github.com/unionj-cloud/toolkit/pipeconn"
 	"github.com/unionj-cloud/toolkit/stringutils"
-	service "go-doudou-rag/module-auth"
-	"go-doudou-rag/module-auth/config"
-	"go-doudou-rag/module-auth/internal/dao"
-	"go-doudou-rag/module-auth/internal/model"
-	"go-doudou-rag/module-auth/transport/httpsrv"
 	"google.golang.org/grpc"
 	"gorm.io/gorm"
-	"os"
 )
 
 var _ plugin.ServicePlugin = (*ModuleAuthPlugin)(nil)
@@ -61,7 +65,12 @@ func (receiver *ModuleAuthPlugin) Initialize(restServer *rest.RestServer, grpcSe
 	dao.Init()
 
 	svc := service.NewModuleAuth(conf)
-	routes := httpsrv.Routes(httpsrv.NewModuleAuthHandler(svc))
+	proxyHandler := &aop.ProxyHandler[service.ModuleAuth]{Impl: svc}
+	dynamicSvc, err := dyno.Dynamic[service.ModuleAuth](proxyHandler.Handle)
+	if err != nil {
+		panic(fmt.Errorf("failed to initialize dynamic auth service: %s", err))
+	}
+	routes := httpsrv.Routes(httpsrv.NewModuleAuthHandler(dynamicSvc))
 	restServer.GroupRoutes("/moduleauth", routes)
 	restServer.GroupRoutes("/moduleauth", rest.DocRoutes(service.Oas))
 }
