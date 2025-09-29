@@ -5,6 +5,8 @@ import (
 	"reflect"
 
 	"github.com/ovechkin-dm/go-dyno/pkg/dyno"
+	"github.com/samber/do"
+	"github.com/samber/lo"
 )
 
 type Greeter interface {
@@ -33,14 +35,23 @@ func (p *ProxyHandler[T]) Handle(m reflect.Method, values []reflect.Value) []ref
 }
 
 func main() {
-	greeter := &SimpleGreeter{}
-	proxyHandler := &ProxyHandler[Greeter]{Impl: greeter}
-	dynamicGreeter, err := dyno.Dynamic[Greeter](proxyHandler.Handle)
-	if err != nil {
-		fmt.Println("Error creating dynamic greeter:", err)
-		return
-	}
+	var g Greeter
+	g = &SimpleGreeter{}
+	do.ProvideNamedValue[Greeter](nil, "greeterBean", g)
 
-	fmt.Println(dynamicGreeter.Greet())
-	fmt.Println(dynamicGreeter.SayHello("World"))
+	lo.ForEach(do.DefaultInjector.ListProvidedServices(), func(item string, index int) {
+		fmt.Printf("item: %s\n", item)
+		greeter := do.MustInvokeNamed[Greeter](nil, item)
+		proxyHandler := &ProxyHandler[any]{Impl: greeter}
+		dynamicGreeter, err := dyno.DynamicByType(proxyHandler.Handle, reflect.TypeOf(greeter))
+		if err != nil {
+			panic(err)
+		}
+		do.OverrideNamedValue(nil, item, dynamicGreeter)
+	})
+
+	greeter := do.MustInvokeNamed[any](nil, "greeterBean")
+	dynaGreeter := greeter.(Greeter)
+	fmt.Println(dynaGreeter.Greet())
+	fmt.Println(dynaGreeter.SayHello("World"))
 }
